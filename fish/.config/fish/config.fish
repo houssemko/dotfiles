@@ -22,7 +22,11 @@ abbr z zoxide
 abbr gc git clone 
 abbr fi flatpak install
 abbr fu flatpak update
-abbr dots git -C ~/.dotfiles add -A && git -C ~/.dotfiles commit -m "update configs" && git -C ~/.dotfiles push
+function dots
+    git -C ~/.dotfiles add -A
+    git -C ~/.dotfiles commit -m "update configs"
+    git -C ~/.dotfiles push
+end
 
 # Get the fastest mirrors
 alias ua-drop-caches='sudo paccache -rk3; paru -Scc --aur --noconfirm'
