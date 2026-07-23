@@ -1,0 +1,66 @@
+{
+    "display": {
+        "separator": " ",
+        "constants": [" "] 
+    },
+    "logo": {
+        "type":"kitty",
+        "source": "${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch/pngs/CachyOS_Logo_catppuccin_1.png",
+        "width": 22,
+        "height": 10,
+        "padding": {
+            "right": 2,
+            "left": 2,
+        }
+    },
+    "modules": [
+        {
+            "type": "colors",
+            "paddingLeft": 12,
+            "symbol": "circle"
+        },
+        {
+            "type": "custom",
+            "format": "┌─────────────────────────────────────┐"
+        },
+        {
+            "type": "os",
+            "key": "   OS",
+            "keyColor": "cyan"
+        },
+        {
+            "type": "kernel",
+            "key": " 󰒋  Kernel",
+            "keyColor": "green"
+        },
+        {
+            "type": "memory",
+            "key": "   Memory",
+            "keyColor": "magenta"
+        },
+        {
+            "type": "swap",
+            "key": "   Swap",
+            "keyColor": "red"
+        },
+        {
+            "type": "uptime",
+            "key": " 󱫐  Uptime",
+            "keyColor": "yellow"
+        },
+        {
+            "type": "de",
+            "key": "   DE",
+            "keyColor": "blue"
+        },
+        {
+            "type": "custom",
+            "format": "└─────────────────────────────────────┘"
+        },
+        {
+            "type": "colors",
+            "paddingLeft": 12,
+            "symbol": "circle"
+        }
+    ]
+}

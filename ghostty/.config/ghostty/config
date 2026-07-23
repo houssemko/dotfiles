@@ -1,0 +1,72 @@
+font-family = cascadia mono
+font-style = cascadia mono 
+font-style = bold 
+bold-color = bright
+clipboard-read = allow
+font-size = 9.5
+font-thicken = true
+gtk-titlebar-style = native
+palette-harmonious = true
+theme = Monokai Pro
+window-subtitle = working-directory
+background-blur= true
+background-opacity= 0.85
+window-padding-balance = true
+window-height = 28
+window-width = 120
+
+# Cursor Configuration
+cursor-style = bar
+cursor-style-blink = true
+
+# Scrollback
+scrollback-limit = 3023
+
+# Terminal features
+mouse-hide-while-typing = true
+
+# Disable annoying copied to clipboard
+app-notifications = no-clipboard-copy,no-config-reload
+
+# Key bindings for common actions
+keybind = ctrl+c=copy_to_clipboard
+keybind = ctrl+v=paste_from_clipboard
+keybind = ctrl+shift+n=new_window
+keybind = ctrl+t=new_tab
+keybind = ctrl+plus=increase_font_size:1
+keybind = ctrl+minus=decrease_font_size:1
+keybind = ctrl+zero=reset_font_size
+
+# Material 3 UI elements
+unfocused-split-opacity = 0.7
+unfocused-split-fill = #44464f
+
+# Shell integration
+shell-integration = detect
+keybind = shift+enter=text:\n
+
+# Rando stuff
+gtk-single-instance = true
+
+background = #1d1f21
+foreground = #FFFFFF
+selection-background = #b2ceee
+selection-foreground = #080808
+cursor-color = #9e9e9e
+cursor-text = #080808
+palette = 0=#323437
+palette = 1=#ff5454
+palette = 2=#8cc85f
+palette = 3=#e3c78a
+palette = 4=#80a0ff
+palette = 5=#cf87e8
+palette = 6=#79dac8
+palette = 7=#c6c6c6
+palette = 8=#949494
+palette = 9=#ff5189
+palette = 10=#36c692
+palette = 11=#c6c684
+palette = 12=#74b2ff
+palette = 13=#ae81ff
+palette = 14=#85dc85
+palette = 15=#e4e4e4
