@@ -6,7 +6,12 @@ abbr wt curl wttr.in/Monastir
 abbr ve pacman -Qs
 abbr ff fastfetch
 abbr se paru -Ss
-abbr cl paru -Scc
+
+function cl
+    paru -Scc
+    sudo find /var/cache/pacman/pkg -name 'download-*' -delete 2>/dev/null
+end
+
 # abbr up paru -Syu --noconfirm
 abbr in sudo pacman -Sy
 abbr ins paru -Sy --noconfirm
