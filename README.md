@@ -12,6 +12,7 @@ My personal config files managed with [GNU Stow](https://www.gnu.org/software/st
 | btop | System monitor |
 | fish | Shell |
 | mpv | Media player |
+| niri | Wayland compositor |
 | yay | AUR helper |
 | paru | AUR helper |
 
