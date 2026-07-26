@@ -12,7 +12,7 @@ window-subtitle = working-directory
 background-blur= true
 background-opacity= 0.85
 window-padding-balance = true
-window-height = 28
+window-height = 32
 window-width = 120
 
 # Cursor Configuration
