@@ -7,7 +7,7 @@ abbr ve pacman -Qs
 abbr ff fastfetch
 abbr se paru -Ss
 abbr cl paru -Scc
-abbr up paru -Syu --noconfirm
+# abbr up paru -Syu --noconfirm
 abbr in sudo pacman -Sy
 abbr ins paru -Sy --noconfirm
 abbr rem sudo pacman -Runs
@@ -21,11 +21,16 @@ abbr merge ffmpeg -f concat -i file.txt -c copy merged.mp4
 abbr z zoxide 
 abbr gc git clone 
 abbr fi flatpak install
-abbr fu flatpak update
+# abbr fu flatpak update
 function dots
     git -C ~/.dotfiles add -A
     git -C ~/.dotfiles commit -m "update configs"
     git -C ~/.dotfiles push
+end
+
+function up 
+   paru -Syu --noconfirm
+   flatpak update
 end
 
 # Get the fastest mirrors
