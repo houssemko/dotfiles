@@ -33,9 +33,11 @@ function dots
     git -C ~/.dotfiles push
 end
 
-function up 
-   paru -Syu --noconfirm
-   flatpak update
+function up
+    echo "paru -Syu --noconfirm"
+    paru -Syu --noconfirm
+    echo "flatpak update"
+    flatpak update
 end
 
 # Get the fastest mirrors
