@@ -36,7 +36,8 @@ end
 function up
     echo "paru -Syu --noconfirm"
     paru -Syu --noconfirm
-    echo "flatpak update"
+    echo "
+    flatpak update"
     flatpak update
 end
 
