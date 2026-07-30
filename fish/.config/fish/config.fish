@@ -26,6 +26,7 @@ abbr merge ffmpeg -f concat -i file.txt -c copy merged.mp4
 abbr z zoxide 
 abbr gc git clone 
 abbr fi flatpak install
+abbr fu flatpak uninstall
 # abbr fu flatpak update
 function dots
     git -C ~/.dotfiles add -A
@@ -37,7 +38,7 @@ function up
     echo "paru -Syu --noconfirm"
     paru -Syu --noconfirm
     echo "
-    flatpak update"
+flatpak update"
     flatpak update
 end
 
