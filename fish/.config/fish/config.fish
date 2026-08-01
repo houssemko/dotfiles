@@ -28,6 +28,7 @@ abbr gc git clone
 abbr fi flatpak install
 abbr fu flatpak uninstall
 # abbr fu flatpak update
+
 function dots
     git -C ~/.dotfiles add -A
     git -C ~/.dotfiles commit -m "update configs"
@@ -39,7 +40,7 @@ function up
     paru -Syu --noconfirm
     echo "
 flatpak update"
-    flatpak update
+    flatpak update -y
 end
 
 # Get the fastest mirrors
