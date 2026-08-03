@@ -98,20 +98,35 @@ function up --description "Comprehensive Arch Linux & Flatpak system update scri
 end
 
 # Get the fastest mirrors
-alias ua-drop-caches='sudo paccache -rk3; paru -Scc --aur --noconfirm'
-alias uac 'sudo true; and \
-    set TMPFILE (mktemp); and \
-    rate-mirrors --save=$TMPFILE --disable-comments-in-file --allow-root --protocol https  --per-mirror-timeout 850 --top-mirrors-number-to-retest 10  arch --completion=1 \
-        && sudo mv /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist-backup \
-        && sudo mv $TMPFILE /etc/pacman.d/mirrorlist \
-    && \
-    set TMPFILE (mktemp); and \
-    rate-mirrors --save=$TMPFILE --disable-comments-in-file --allow-root --protocol https --per-mirror-timeout 1500  chaotic-aur \
-        && sudo mv /etc/pacman.d/chaotic-mirrorlist /etc/pacman.d/chaotic-mirrorlist-backup \
-        && sudo mv $TMPFILE /etc/pacman.d/chaotic-mirrorlist \
-    && \
-    ua-drop-caches && paru -Syyu --noconfirm'
-    
+function uac --description "Update Chaotic-AUR mirrorlist and refresh repository"
+    # Pre-authorize sudo
+    if not sudo -v
+        echo "Sudo authentication failed."
+        return 1
+    end
+
+    set -l tmpfile (mktemp)
+
+    echo "==> Rating Chaotic-AUR mirrors..."
+    if rate-mirrors --save=$tmpfile --disable-comments-in-file --allow-root --protocol https --per-mirror-timeout 1500 chaotic-aur
+        echo "==> Backing up and updating chaotic-mirrorlist..."
+        sudo mv /etc/pacman.d/chaotic-mirrorlist /etc/pacman.d/chaotic-mirrorlist-backup
+        sudo mv $tmpfile /etc/pacman.d/chaotic-mirrorlist
+        
+        # Clean caches if the command exists/aliased
+        if functions -q ua-drop-caches; or alias -q ua-drop-caches
+            ua-drop-caches
+        end
+
+        echo "==> Syncing database..."
+        paru -Sy --noconfirm
+        echo "✔ Chaotic-AUR mirrorlist updated successfully!"
+    else
+        echo "❌ rate-mirrors failed. Mirrorlist unchanged."
+        rm -f $tmpfile
+        return 1
+    end
+end
 # Cleanup local orphaned packages
 function cleanup 
     while pacman -Qdtq --noconfirm
