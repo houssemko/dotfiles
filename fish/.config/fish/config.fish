@@ -35,12 +35,66 @@ function dots
     git -C ~/.dotfiles push
 end
 
-function up
-    echo "paru -Syu --noconfirm"
-    paru -Syu --noconfirm
-    echo "
-flatpak update"
-    flatpak update -y
+function up --description "Comprehensive Arch Linux & Flatpak system update script"
+    # Helper for consistent headers
+    function _up_header -a text
+        set_color --bold cyan
+        echo -e "\n==> $text"
+        set_color normal
+    end
+
+    set_color --bold green
+    echo "========================================"
+    echo "       Starting System Update           "
+    echo "========================================"
+    set_color normal
+
+    _up_header "Updating System & AUR Packages (paru)"
+    if command -q paru
+        paru -Syu --noconfirm
+    else
+        echo "paru not found, falling back to pacman..."
+        sudo pacman -Syu --noconfirm
+    end
+
+    if command -q flatpak
+        _up_header "Updating Flatpaks"
+        flatpak update -y
+    end
+
+    _up_header "Checking for Orphaned Packages"
+    set -l orphans (pacman -Qtdq)
+    if test -n "$orphans"
+        echo "Removing orphaned packages: $orphans"
+        sudo pacman -Rns $orphans --noconfirm
+    else
+        set_color green
+        echo "No orphaned packages to remove."
+        set_color normal
+    end
+
+    if command -q paccache
+        _up_header "Cleaning Package Cache"
+        sudo paccache -r
+    end
+
+    _up_header "Checking for Failed Systemd Services"
+    set -l failed_services (systemctl --failed --plain --no-legend)
+    if test -n "$failed_services"
+        set_color red
+        echo "Warning: The following services have failed:"
+        systemctl --failed
+        set_color normal
+    else
+        set_color green
+        echo "All systemd services are running normally."
+        set_color normal
+    end
+
+    echo "----------------------------------------"
+    set_color --bold green
+    echo "✔ System update complete!"
+    set_color normal
 end
 
 # Get the fastest mirrors
