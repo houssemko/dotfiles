@@ -12,7 +12,6 @@ function cl
     sudo find /var/cache/pacman/pkg -name 'download-*' -delete 2>/dev/null
 end
 
-# abbr up paru -Syu --noconfirm
 abbr in sudo pacman -Sy
 abbr ins paru -Sy --noconfirm
 abbr rem sudo pacman -Runs
@@ -27,7 +26,6 @@ abbr z zoxide
 abbr gc git clone 
 abbr fi flatpak install
 abbr fu flatpak uninstall
-# abbr fu flatpak update
 
 function dots
     git -C ~/.dotfiles add -A
@@ -35,8 +33,8 @@ function dots
     git -C ~/.dotfiles push
 end
 
-function up --description "Comprehensive Arch Linux & Flatpak system update script"
-    # Helper for consistent headers
+# Arch Linux & Flatpak system update
+function up 
     function _up_header -a text
         set_color --bold cyan
         echo -e "\n==> $text"
@@ -44,11 +42,7 @@ function up --description "Comprehensive Arch Linux & Flatpak system update scri
     end
 
     set_color --bold green
-    echo "========================================"
-    echo "       Starting System Update           "
-    echo "========================================"
     set_color normal
-
     _up_header "Updating System & AUR Packages (paru)"
     if command -q paru
         paru -Syu --noconfirm
@@ -127,6 +121,7 @@ function uac --description "Update Chaotic-AUR mirrorlist and refresh repository
         return 1
     end
 end
+
 # Cleanup local orphaned packages
 function cleanup 
     while pacman -Qdtq --noconfirm
