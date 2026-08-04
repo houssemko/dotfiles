@@ -56,22 +56,6 @@ function up
         flatpak update -y
     end
 
-    _up_header "Checking for Orphaned Packages"
-    set -l orphans (pacman -Qtdq)
-    if test -n "$orphans"
-        echo "Removing orphaned packages: $orphans"
-        sudo pacman -Rns $orphans --noconfirm
-    else
-        set_color green
-        echo "No orphaned packages to remove."
-        set_color normal
-    end
-
-    if command -q paccache
-        _up_header "Cleaning Package Cache"
-        sudo paccache -r
-    end
-
     _up_header "Checking for Failed Systemd Services"
     set -l failed_services (systemctl --failed --plain --no-legend)
     if test -n "$failed_services"
