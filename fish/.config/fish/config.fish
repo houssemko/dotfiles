@@ -43,6 +43,7 @@ function up
 
     set_color --bold green
     set_color normal
+    
     _up_header "Updating System & AUR Packages (paru)"
     if command -q paru
         paru -Syu --noconfirm
@@ -51,9 +52,43 @@ function up
         sudo pacman -Syu --noconfirm
     end
 
+    _up_header "Removing Orphaned Packages"
+    set -l orphans (pacman -Qtdq)
+    if test -n "$orphans"
+        sudo pacman -Rns $orphans --noconfirm
+    else
+        echo "No orphaned packages found."
+    end
+
+    if command -q paccache
+        _up_header "Cleaning Package Cache"
+        paccache -r
+    end
+
     if command -q flatpak
         _up_header "Updating Flatpaks"
         flatpak update -y
+        _up_header "Cleaning Unused Flatpaks"
+        flatpak uninstall --unused -y
+    end
+
+    if command -q fwupdmgr
+        _up_header "Checking Firmware Updates"
+        fwupdmgr refresh > /dev/null 2>&1
+        fwupdmgr get-updates || echo "No firmware updates available."
+    end
+
+    _up_header "Checking for .pacnew / .pacsave files"
+    set -l pacnew_files (find /etc -type f -name "*.pacnew" -o -name "*.pacsave" 2>/dev/null)
+    if test -n "$pacnew_files"
+        set_color yellow
+        echo "Warning: Configuration files require merging:"
+        for file in $pacnew_files
+            echo "  -> $file"
+        end
+        set_color normal
+    else
+        echo "No configuration files require merging."
     end
 
     _up_header "Checking for Failed Systemd Services"
