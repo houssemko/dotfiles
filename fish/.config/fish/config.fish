@@ -33,7 +33,7 @@ function dots
     git -C ~/.dotfiles push
 end
 
-# Arch Linux & Flatpak system update
+# System update
 function up 
     function _up_header -a text
         set_color --bold cyan
@@ -44,7 +44,7 @@ function up
     set_color --bold green
     set_color normal
     
-    _up_header "Updating System & AUR Packages (paru)"
+    _up_header "Updating System & AUR Packages"
     if command -q paru
         paru -Syu --noconfirm
     else
@@ -71,13 +71,7 @@ function up
         _up_header "Cleaning Unused Flatpaks"
         flatpak uninstall --unused -y
     end
-
-    if command -q fwupdmgr
-        _up_header "Checking Firmware Updates"
-        fwupdmgr refresh > /dev/null 2>&1
-        fwupdmgr get-updates || echo "No firmware updates available."
-    end
-
+    
     _up_header "Checking for .pacnew / .pacsave files"
     set -l pacnew_files (find /etc -type f -name "*.pacnew" -o -name "*.pacsave" 2>/dev/null)
     if test -n "$pacnew_files"
