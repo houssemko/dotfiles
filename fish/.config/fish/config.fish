@@ -68,8 +68,6 @@ function up
     if command -q flatpak
         _up_header "Updating Flatpaks"
         flatpak update -y
-        _up_header "Cleaning Unused Flatpaks"
-        flatpak uninstall --unused -y
     end
     
     _up_header "Checking for .pacnew / .pacsave files"
