@@ -28,7 +28,6 @@ abbr fi flatpak install
 abbr fu flatpak uninstall
 
 function dots
-    # Adopt changes from ~/.config into ~/.dotfiles for all stow packages
     for pkg in btop cava fastfetch fish ghostty mpv niri paru yay vivaldi-stable
         if test -d ~/.dotfiles/$pkg
             stow -d ~/.dotfiles --target ~/.config --adopt $pkg 2>/dev/null; or true
