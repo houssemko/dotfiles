@@ -1136,3 +1136,75 @@ function open_subtitle_downloader()
 		end
 	)
 end
+
+-- Video adjustments menu (brightness, contrast, saturation, gamma, hue)
+function open_video_adjust_menu()
+	if Menu:is_open('video-adjust') then
+		Menu:close()
+		return
+	end
+
+	local items = {
+		{
+			title = t('Brightness'),
+			hint = t('Default: 0'),
+			value = 'brightness',
+			items = {
+				{title = t('Increase'), value = 'add brightness 5.0', keep_open = true},
+				{title = t('Decrease'), value = 'add brightness -5.0', keep_open = true},
+				{title = t('Reset'), value = 'set brightness 0'},
+			},
+		},
+		{
+			title = t('Contrast'),
+			hint = t('Default: 1'),
+			value = 'contrast',
+			items = {
+				{title = t('Increase'), value = 'add contrast 5.0', keep_open = true},
+				{title = t('Decrease'), value = 'add contrast -5.0', keep_open = true},
+				{title = t('Reset'), value = 'set contrast 1'},
+			},
+		},
+		{
+			title = t('Saturation'),
+			hint = t('Default: 1'),
+			value = 'saturation',
+			items = {
+				{title = t('Increase'), value = 'add saturation 5.0', keep_open = true},
+				{title = t('Decrease'), value = 'add saturation -5.0', keep_open = true},
+				{title = t('Reset'), value = 'set saturation 1'},
+			},
+		},
+		{
+			title = t('Gamma'),
+			hint = t('Default: 1'),
+			value = 'gamma',
+			items = {
+				{title = t('Increase'), value = 'add gamma 5.0', keep_open = true},
+				{title = t('Decrease'), value = 'add gamma -5.0', keep_open = true},
+				{title = t('Reset'), value = 'set gamma 1'},
+			},
+		},
+		{
+			title = t('Hue'),
+			hint = t('Default: 0'),
+			value = 'hue',
+			items = {
+				{title = t('Increase'), value = 'add hue 5.0', keep_open = true},
+				{title = t('Decrease'), value = 'add hue -5.0', keep_open = true},
+				{title = t('Reset'), value = 'set hue 0'},
+			},
+		},
+		{
+			title = t('Reset all'),
+			value = 'set brightness 0; set contrast 1; set saturation 1; set gamma 1; set hue 0',
+		},
+	}
+
+	open_command_menu({
+		type = 'video-adjust',
+		title = t('Video adjustments'),
+		items = items,
+		item_actions_place = 'inside',
+	})
+end
