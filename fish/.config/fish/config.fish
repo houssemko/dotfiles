@@ -58,19 +58,6 @@ function up
         sudo pacman -Syu --noconfirm
     end
 
-    _up_header "Removing Orphaned Packages"
-    set -l orphans (pacman -Qtdq)
-    if test -n "$orphans"
-        sudo pacman -Rns $orphans --noconfirm
-    else
-        echo "No orphaned packages found."
-    end
-
-    if command -q paccache
-        _up_header "Cleaning Package Cache"
-        paccache -r
-    end
-
     if command -q flatpak
         _up_header "Updating Flatpaks"
         flatpak update -y
@@ -104,6 +91,7 @@ function up
 
     echo "----------------------------------------"
     set_color --bold green
+    
     echo "✔ System update complete!"
     set_color normal
 end
