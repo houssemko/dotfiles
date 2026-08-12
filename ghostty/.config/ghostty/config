@@ -1,9 +1,9 @@
-font-family = cascadia mono
-font-style = cascadia mono 
+font-family = cascadia mono 
+font-style = cascadia mono PL
 font-style = bold 
 bold-color = bright
 clipboard-read = allow
-font-size = 9.725
+font-size = 9.5
 font-thicken = true
 gtk-titlebar-style = native
 palette-harmonious = true
