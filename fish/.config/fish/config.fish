@@ -1,7 +1,6 @@
 source /usr/share/cachyos-fish-config/cachyos-config.fish
 
 # Abbreviations
-abbr rm trash 
 abbr wt curl wttr.in/Monastir
 abbr ve pacman -Qs
 abbr ff fastfetch
@@ -139,3 +138,4 @@ set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
 
 # Added by Antigravity CLI installer
 set -gx PATH "/home/houssem/.local/bin" $PATH
+
