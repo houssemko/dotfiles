@@ -38,6 +38,12 @@ function dots
     git -C ~/.dotfiles push
 end
 
+function vthemes
+    git -C ~/Vivaldi-Blur-Theme add -A
+    git -C ~/Vivaldi-Blur-Theme commit -m "update vivaldi theme"
+    git -C ~/Vivaldi-Blur-Theme push
+end
+
 # System update
 function up 
     function _up_header -a text
