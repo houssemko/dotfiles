@@ -63,23 +63,39 @@ inotifywait -qmr -e create -e modify -e delete -e move --exclude '\.git/' "${DIR
 while read -r path event file; do
     [[ -n "$SLEEP_PID" ]] && kill "$SLEEP_PID" 2>/dev/null && wait "$SLEEP_PID" 2>/dev/null
 
-    (
+    if [[ "$FOREGROUND" == "true" ]]; then
         sleep 2
         sync_config_to_dotfiles
         git -C "$HOME/.dotfiles" add -A
         if git -C "$HOME/.dotfiles" diff --cached --quiet; then
             echo "No changes to commit"
-            notify-send "dots" "No changes to commit" 2>/dev/null
         else
             git -C "$HOME/.dotfiles" commit -m "update configs"
             if git -C "$HOME/.dotfiles" push; then
                 echo "Configs updated and pushed"
-                notify-send "dots" "Configs updated and pushed" 2>/dev/null
             else
                 echo "Commit created, push failed (run 'git pull' in ~/.dotfiles)"
-                notify-send "dots" "Commit created, push failed" 2>/dev/null
             fi
         fi
-    ) >> "$HOME/.dotfiles/watcher.log" 2>&1 &
-    SLEEP_PID=$!
+    else
+        (
+            sleep 2
+            sync_config_to_dotfiles
+            git -C "$HOME/.dotfiles" add -A
+            if git -C "$HOME/.dotfiles" diff --cached --quiet; then
+                echo "No changes to commit"
+                notify-send "dots" "No changes to commit" 2>/dev/null
+            else
+                git -C "$HOME/.dotfiles" commit -m "update configs"
+                if git -C "$HOME/.dotfiles" push; then
+                    echo "Configs updated and pushed"
+                    notify-send "dots" "Configs updated and pushed" 2>/dev/null
+                else
+                    echo "Commit created, push failed (run 'git pull' in ~/.dotfiles)"
+                    notify-send "dots" "Commit created, push failed" 2>/dev/null
+                fi
+            fi
+        ) >> "$HOME/.dotfiles/watcher.log" 2>&1 &
+        SLEEP_PID=$!
+    fi
 done
