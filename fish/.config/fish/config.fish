@@ -27,7 +27,37 @@ abbr fi flatpak install
 abbr fu flatpak uninstall
 
 function dots --description "Sync dotfiles and push to remote. Use 'dots --watch' for live watching."
-    if test "$argv[1]" = "--watch"
+    # Parse flags
+    set -l dry_run false
+    set -l verbose false
+    set -l no_git false
+    set -l watch false
+    set -l debounce 2
+    set -l watch_args
+
+    for arg in $argv
+        switch $arg
+            case --dry-run
+                set dry_run true
+            case --verbose
+                set verbose true
+            case --no-git
+                set no_git true
+            case --watch
+                set watch true
+            case --debounce
+                # Next arg will be the value
+            case '*'
+                # Check if previous was --debounce
+                if test "$argv[(math (string match --index $arg $argv) - 1)]" = "--debounce"
+                    set debounce $arg
+                else
+                    set -a watch_args $arg
+                end
+        end
+    end
+
+    if test "$watch" = "true"
         if not command -q inotifywait
             echo "inotifywait not found. Install inotify-tools: pacman -Sy inotify-tools"
             return 1
@@ -44,11 +74,29 @@ function dots --description "Sync dotfiles and push to remote. Use 'dots --watch
         end
         test (count $pkg_dirs) -eq 0; and echo "No packages to watch"; and return 1
 
-        dots-watch --foreground $pkg_dirs
+        set -l watch_cmd "dots-watch --foreground"
+        if test "$no_git" = "true"
+            set -a watch_cmd --no-git
+        end
+        if test "$debounce" != "2"
+            set -a watch_cmd --debounce $debounce
+        end
+        set -a watch_cmd $pkg_dirs
+        eval $watch_cmd
         return
     end
 
-    dots-sync
+    set -l sync_cmd "dots-sync"
+    if test "$dry_run" = "true"
+        set -a sync_cmd --dry-run
+    end
+    if test "$verbose" = "true"
+        set -a sync_cmd --verbose
+    end
+    if test "$no_git" = "true"
+        set -a sync_cmd --no-git
+    end
+    eval $sync_cmd
 end
 
 # System update

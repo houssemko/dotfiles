@@ -5,14 +5,19 @@ set -euo pipefail
 
 DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
 LOG_FILE="${LOG_FILE:-$DOTFILES_DIR/watcher.log}"
-LOCK_FILE="${LOCK_FILE:-$DOTFILES_DIR/.sync.lock}"
+LOCK_FILE="${LOCK_FILE:-/tmp/dots-sync.lock}"
+
+GIT_CONFIG_VALIDATED=0
 
 log() {
-    echo "[$(date '+%H:%M:%S')] $1"
+    local msg="[$(date '+%H:%M:%S')] $1"
+    echo "$msg"
+    echo "$msg" >>"$LOG_FILE" 2>/dev/null || true
 }
 
-# Validate git config
+# Validate git config (cached)
 validate_git_config() {
+    [[ $GIT_CONFIG_VALIDATED -eq 1 ]] && return 0
     if ! git -C "$DOTFILES_DIR" config user.name >/dev/null 2>&1; then
         log "ERROR: git user.name not set in $DOTFILES_DIR"
         return 1
@@ -21,6 +26,7 @@ validate_git_config() {
         log "ERROR: git user.email not set in $DOTFILES_DIR"
         return 1
     fi
+    GIT_CONFIG_VALIDATED=1
     return 0
 }
 
@@ -46,7 +52,7 @@ recreate_symlinks() {
         [[ "$(basename "$pkg_dir")" == ".git" ]] && continue
         [[ "$(basename "$pkg_dir")" == "scripts" ]] && continue
         pkg=$(basename "$pkg_dir")
-        stow -d "$DOTFILES_DIR" --target "$HOME" "$pkg" 2>/dev/null || true
+        stow -d "$DOTFILES_DIR" --target "$HOME" "$pkg" 2>&1 | grep -v "^$" || true
     done
 }
 
@@ -60,7 +66,6 @@ sync_config_to_dotfiles() {
         dst="$DOTFILES_DIR/$pkg/.config/$pkg"
         [[ -d "$src" ]] || continue
         mkdir -p "$dst"
-        # Use rsync for incremental sync + deletion of removed files
         rsync -a --delete "$src/" "$dst/" 2>/dev/null || true
     done
 }
@@ -72,7 +77,9 @@ git_sync_and_push() {
         log "No changes to commit"
         return 0
     fi
-    git -C "$DOTFILES_DIR" commit -m "update configs" >/dev/null
+    local file_count
+    file_count=$(git -C "$DOTFILES_DIR" diff --cached --name-only | wc -l)
+    git -C "$DOTFILES_DIR" commit -m "update configs ($file_count files)" >/dev/null
     if git -C "$DOTFILES_DIR" pull --rebase --autostash 2>/dev/null && \
        git -C "$DOTFILES_DIR" push 2>&1; then
         log "Configs updated and pushed"
@@ -85,15 +92,30 @@ git_sync_and_push() {
 # Full sync cycle: sync -> git -> stow
 # Returns 0 on success, 1 on failure
 full_sync() {
+    local dry_run="${DRY_RUN:-0}"
+    local no_git="${NO_GIT:-0}"
+    local verbose="${VERBOSE:-0}"
+
     acquire_lock || return 1
     log "Starting sync..."
     sync_config_to_dotfiles
-    git_sync_and_push
-    local git_rc=$?
-    recreate_symlinks
+    if [[ $no_git -eq 0 ]]; then
+        if [[ $dry_run -eq 1 ]]; then
+            log "DRY RUN: would commit and push"
+        else
+            git_sync_and_push
+        fi
+    else
+        log "Skipping git (--no-git)"
+    fi
+    if [[ $dry_run -eq 0 ]]; then
+        recreate_symlinks
+    else
+        log "DRY RUN: would recreate symlinks"
+    fi
     release_lock
     log "Sync complete"
-    return $git_rc
+    return 0
 }
 
 # Export functions for sourcing
