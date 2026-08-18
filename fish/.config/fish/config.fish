@@ -43,7 +43,7 @@ function dots
         end
 
         echo "Watching ~/.config for changes... (Ctrl+C to stop)"
-        inotifywait -m -r ~/.config -e create -e modify -e delete -e move |
+        inotifywait -q -m -r ~/.config -e create -e modify -e delete -e move |
             while read -l path event file
                 test -f /tmp/.dots_lock; and continue
 
