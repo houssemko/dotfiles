@@ -57,8 +57,9 @@ function dots --description "Sync dotfiles and push to remote. Use 'dots --watch
     for dir in $dotfiles_dir/*/
         set -l pkg (basename $dir)
         if test -d ~/.config/$pkg
-            rsync -a --update --exclude='cache/' --exclude='__pycache__/' \
-                --exclude='.git/' ~/.config/$pkg/ $dir/.config/$pkg/ 2>/dev/null
+            set -l dst $dir/.config/$pkg
+            mkdir -p $dst
+            cp -ru ~/.config/$pkg/. $dst/ 2>/dev/null
         end
     end
 
