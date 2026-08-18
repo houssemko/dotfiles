@@ -168,12 +168,7 @@ set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
 
 # Added by Antigravity CLI installer
 set -gx PATH "/home/houssem/.local/bin" $PATH
-test
 # test
-test
 # test
 # bg test 2
 # test3
-test
-test
-test2
