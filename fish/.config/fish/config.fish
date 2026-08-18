@@ -70,9 +70,6 @@ function up
         set_color normal
     end
 
-    set_color --bold green
-    set_color normal
-    
     _up_header "Updating System & AUR Packages"
     if command -q paru
         paru -Syu --noconfirm
