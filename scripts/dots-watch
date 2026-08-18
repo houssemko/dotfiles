@@ -11,20 +11,34 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+sync_config_to_dotfiles() {
+    for pkg_dir in "$HOME"/.dotfiles/*/; do
+        pkg=$(basename "$pkg_dir")
+        src="$HOME/.config/$pkg"
+        dst="$HOME/.dotfiles/$pkg/.config/$pkg"
+        [[ -d "$src" ]] || continue
+        # Copy only real files (skip symlinks and caches)
+        find "$src" -type f ! -type l -not -path '*/cache/*' -not -path '*/__pycache__/*' | while read -r f; do
+            rel="${f#$src/}"
+            mkdir -p "$dst/$(dirname "$rel")"
+            cp -u "$f" "$dst/$rel" 2>/dev/null
+        done
+        # Copy new directories
+        find "$src" -type d ! -type l | while read -r d; do
+            rel="${d#$src/}"
+            [[ "$rel" == "$d" ]] && continue
+            mkdir -p "$dst/$rel" 2>/dev/null
+        done
+    done
+}
+
 inotifywait -qmr -e create -e modify -e delete -e move --exclude '\.git/' "${DIRS[@]}" |
 while read -r path event file; do
     [[ -n "$SLEEP_PID" ]] && kill "$SLEEP_PID" 2>/dev/null && wait "$SLEEP_PID" 2>/dev/null
 
     (
         sleep 2
-        # Adopt new files from .config into stow packages
-        for pkg_dir in "$HOME"/.dotfiles/*/; do
-            pkg=$(basename "$pkg_dir")
-            src="$HOME/.config/$pkg"
-            if [[ -d "$src" ]]; then
-                stow -d "$HOME/.dotfiles" --target "$HOME/.config" --adopt "$pkg" 2>/dev/null || true
-            fi
-        done
+        sync_config_to_dotfiles
         git -C "$HOME/.dotfiles" add -A
         git -C "$HOME/.dotfiles" diff --cached --quiet || {
             git -C "$HOME/.dotfiles" commit -m "update configs"
