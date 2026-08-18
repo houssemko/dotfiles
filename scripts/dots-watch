@@ -5,6 +5,7 @@
 DIRS=("$@")
 SLEEP_PID=""
 export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
 
 sync_config_to_dotfiles() {
     for pkg_dir in "$HOME"/.dotfiles/*/; do
