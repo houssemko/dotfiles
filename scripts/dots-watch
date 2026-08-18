@@ -5,6 +5,17 @@
 DIRS=("$@")
 SLEEP_PID=""
 
+# Initial status check
+sync_config_to_dotfiles
+git -C "$HOME/.dotfiles" add -A
+if git -C "$HOME/.dotfiles" diff --cached --quiet; then
+    echo "No changes to commit"
+else
+    git -C "$HOME/.dotfiles" commit -m "update configs"
+    git -C "$HOME/.dotfiles" push
+    echo "Configs updated and pushed"
+fi
+
 cleanup() {
     [[ -n "$SLEEP_PID" ]] && kill "$SLEEP_PID" 2>/dev/null
     exit 0
