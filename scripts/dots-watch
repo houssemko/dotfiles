@@ -23,6 +23,15 @@ log() { echo "$1"; }
 
 notify() { notify-send "dots" "$1" 2>/dev/null || true; }
 
+recreate_symlinks() {
+    local pkg
+    for pkg_dir in "$DOTFILES_DIR"/*/; do
+        [[ "$(basename "$pkg_dir")" == ".git" ]] && continue
+        pkg=$(basename "$pkg_dir")
+        stow -d "$DOTFILES_DIR" --target "$HOME/.config" "$pkg" 2>/dev/null || true
+    done
+}
+
 sync_config_to_dotfiles() {
     local pkg src dst
     for pkg_dir in "$DOTFILES_DIR"/*/; do
