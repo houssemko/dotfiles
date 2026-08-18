@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Watch dotfiles for changes and auto-commit+push
+# Usage: dots-watch <dir1> [dir2] [dir3] ...
+
+DIRS=("$@")
+SLEEP_PID=""
+
+cleanup() {
+    [[ -n "$SLEEP_PID" ]] && kill "$SLEEP_PID" 2>/dev/null
+    exit 0
+}
+trap cleanup EXIT INT TERM
+
+inotifywait -qmr -e create -e modify -e delete -e move --exclude '\.git/' "${DIRS[@]}" |
+while read -r path event file; do
+    [[ -n "$SLEEP_PID" ]] && kill "$SLEEP_PID" 2>/dev/null && wait "$SLEEP_PID" 2>/dev/null
+
+    (
+        sleep 2
+        git -C "$HOME/.dotfiles" add -A
+        git -C "$HOME/.dotfiles" diff --cached --quiet || {
+            git -C "$HOME/.dotfiles" commit -m "update configs"
+            git -C "$HOME/.dotfiles" push
+        }
+    ) &
+    SLEEP_PID=$!
+done
