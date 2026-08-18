@@ -33,14 +33,19 @@ function dots
             return 1
         end
 
+        # Kill existing watcher
+        pkill -f "dots-watch" 2>/dev/null
+        sleep 0.2
+
         set -l pkg_dirs
         for dir in ~/.dotfiles/*/
             set -a pkg_dirs $dir
         end
         test (count $pkg_dirs) -eq 0; and echo "No packages to watch"; and return 1
 
-        echo "Watching for changes... (Ctrl+C to stop)"
-        dots-watch $pkg_dirs
+        dots-watch $pkg_dirs &
+        disown
+        echo "Dots watcher started in background (pid $last_pid)"
         return
     end
 
@@ -156,3 +161,4 @@ test
 # test
 test
 # test
+# bg test 2
