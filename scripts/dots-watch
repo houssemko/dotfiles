@@ -4,6 +4,14 @@
 
 DIRS=("$@")
 SLEEP_PID=""
+FOREGROUND=false
+
+# Parse args
+if [[ "${DIRS[0]}" == "--foreground" ]]; then
+    FOREGROUND=true
+    DIRS=("${DIRS[@]:1}")
+fi
+
 export DISPLAY="${DISPLAY:-:0}"
 export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
 
