@@ -36,9 +36,13 @@ if git -C "$HOME/.dotfiles" diff --cached --quiet; then
     notify-send "dots" "No changes to commit" 2>/dev/null
 else
     git -C "$HOME/.dotfiles" commit -m "update configs"
-    git -C "$HOME/.dotfiles" push
-    echo "Configs updated and pushed"
-    notify-send "dots" "Configs updated and pushed" 2>/dev/null
+    if git -C "$HOME/.dotfiles" push; then
+        echo "Configs updated and pushed"
+        notify-send "dots" "Configs updated and pushed" 2>/dev/null
+    else
+        echo "Commit created, push failed (run 'git pull' in ~/.dotfiles)"
+        notify-send "dots" "Commit created, push failed" 2>/dev/null
+    fi
 fi
 
 cleanup() {
