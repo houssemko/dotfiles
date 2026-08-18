@@ -26,7 +26,7 @@ abbr gc git clone
 abbr fi flatpak install
 abbr fu flatpak uninstall
 
-function dots
+function dots --description "Sync dotfiles and push to remote. Use 'dots --watch' for live watching."
     if test "$argv[1]" = "--watch"
         if not command -q inotifywait
             echo "inotifywait not found. Install inotify-tools: pacman -Sy inotify-tools"
@@ -45,19 +45,34 @@ function dots
         return
     end
 
-    for dir in ~/.dotfiles/*/
-        stow -d ~/.dotfiles --target ~/.config --adopt (basename "$dir") 2>/dev/null; or true
-    end
-    git -C ~/.dotfiles add -A
+    set -l dotfiles_dir ~/.dotfiles
+    set -l log_file "$dotfiles_dir/watcher.log"
 
-    if git -C ~/.dotfiles diff --cached --quiet
+    if not test -d "$dotfiles_dir"
+        echo "Dotfiles directory not found: $dotfiles_dir"
+        return 1
+    end
+
+    # Sync config -> dotfiles repo
+    for dir in $dotfiles_dir/*/
+        set -l pkg (basename $dir)
+        if test -d ~/.config/$pkg
+            rsync -a --update --exclude='cache/' --exclude='__pycache__/' \
+                --exclude='.git/' ~/.config/$pkg/ $dir/.config/$pkg/ 2>/dev/null
+        end
+    end
+
+    git -C $dotfiles_dir add -A
+
+    if git -C $dotfiles_dir diff --cached --quiet
         echo "No changes to commit"
     else
-        git -C ~/.dotfiles commit -m "update configs"
-        if git -C ~/.dotfiles push
+        git -C $dotfiles_dir commit -m "update configs" >/dev/null
+        if git -C $dotfiles_dir pull --rebase --autostash 2>/dev/null; and git -C $dotfiles_dir push
             echo "Configs updated and pushed"
         else
-            echo "Commit created, push failed (run 'git pull' in ~/.dotfiles)"
+            echo "Commit created, push failed (run 'git pull' in $dotfiles_dir)"
+            return 1
         end
     end
 end
