@@ -26,7 +26,7 @@ abbr gc git clone
 abbr fi flatpak install
 abbr fu flatpak uninstall
 
-function dots --description "Capture dotfile changes with chezmoi and push. Use 'dots --watch' to watch the source dir."
+function dots --description "Capture dotfile changes with chezmoi and push."
     argparse 'dry-run' 'verbose' 'no-git' 'watch' -- $argv
     or return 1
 
