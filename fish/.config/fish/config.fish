@@ -151,9 +151,12 @@ function uac --description "Update Chaotic-AUR mirrorlist and refresh repository
 end
 
 # Cleanup local orphaned packages
-function cleanup 
-    while pacman -Qdtq --noconfirm
-        sudo pacman -R (pacman -Qdtq)
+function cleanup
+    set -l orphans (pacman -Qdtq 2>/dev/null)
+    if test -n "$orphans"
+        sudo pacman -R $orphans
+    else
+        echo "No orphaned packages"
     end
 end
       
