@@ -36,4 +36,4 @@ while read -r path event file; do
     log "Change detected: $path$file ($event)"
     sleep 2
     full_sync || log "Sync failed, continuing..."
-done < <(wait $INOTIFY_PID)
+done < <(wait $INOTIFY_PID) || { release_lock; exit 1; }

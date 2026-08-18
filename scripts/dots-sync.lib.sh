@@ -11,6 +11,19 @@ log() {
     echo "[$(date '+%H:%M:%S')] $1"
 }
 
+# Validate git config
+validate_git_config() {
+    if ! git -C "$DOTFILES_DIR" config user.name >/dev/null 2>&1; then
+        log "ERROR: git user.name not set in $DOTFILES_DIR"
+        return 1
+    fi
+    if ! git -C "$DOTFILES_DIR" config user.email >/dev/null 2>&1; then
+        log "ERROR: git user.email not set in $DOTFILES_DIR"
+        return 1
+    fi
+    return 0
+}
+
 # Acquire exclusive lock with timeout (default 30s)
 acquire_lock() {
     local timeout="${1:-30}"
@@ -24,6 +37,7 @@ acquire_lock() {
 release_lock() {
     flock -u 9 2>/dev/null || true
     exec 9>&- 2>/dev/null || true
+    rm -f "$LOCK_FILE" 2>/dev/null || true
 }
 
 recreate_symlinks() {
@@ -46,11 +60,13 @@ sync_config_to_dotfiles() {
         dst="$DOTFILES_DIR/$pkg/.config/$pkg"
         [[ -d "$src" ]] || continue
         mkdir -p "$dst"
-        cp -ru "$src/." "$dst/" 2>/dev/null || true
+        # Use rsync for incremental sync + deletion of removed files
+        rsync -a --delete "$src/" "$dst/" 2>/dev/null || true
     done
 }
 
 git_sync_and_push() {
+    validate_git_config || return 1
     git -C "$DOTFILES_DIR" add -A
     if git -C "$DOTFILES_DIR" diff --cached --quiet; then
         log "No changes to commit"
@@ -81,4 +97,4 @@ full_sync() {
 }
 
 # Export functions for sourcing
-export -f log acquire_lock release_lock recreate_symlinks sync_config_to_dotfiles git_sync_and_push full_sync
+export -f log acquire_lock release_lock recreate_symlinks sync_config_to_dotfiles git_sync_and_push full_sync validate_git_config
