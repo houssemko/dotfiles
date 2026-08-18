@@ -34,6 +34,7 @@ function dots --description "Sync dotfiles and push to remote. Use 'dots --watch
     set -l watch false
     set -l debounce 2
     set -l watch_args
+    set -l prev_arg ""
 
     for arg in $argv
         switch $arg
@@ -48,13 +49,13 @@ function dots --description "Sync dotfiles and push to remote. Use 'dots --watch
             case --debounce
                 # Next arg will be the value
             case '*'
-                # Check if previous was --debounce
-                if test "$argv[(math (string match --index $arg $argv) - 1)]" = "--debounce"
+                if test "$prev_arg" = "--debounce"
                     set debounce $arg
                 else
                     set -a watch_args $arg
                 end
         end
+        set prev_arg $arg
     end
 
     if test "$watch" = "true"
