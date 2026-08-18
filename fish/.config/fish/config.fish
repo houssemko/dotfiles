@@ -174,3 +174,4 @@ set -gx PATH "/home/houssem/.local/bin" $PATH
 # test3
 test
 test_change
+test_change2
