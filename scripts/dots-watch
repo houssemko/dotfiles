@@ -15,13 +15,7 @@ if [[ "${DIRS[0]}" == "--foreground" ]]; then
     DIRS=("${DIRS[@]:1}")
 fi
 
-# Export for notify-send when run without a full X session
-export DISPLAY="${DISPLAY:-:0}"
-export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
-
 log() { echo "$1"; }
-
-notify() { notify-send "dots" "$1" 2>/dev/null || true; }
 
 recreate_symlinks() {
     local pkg
