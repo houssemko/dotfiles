@@ -172,4 +172,3 @@ set -gx PATH "/home/houssem/.local/bin" $PATH
 # test
 # bg test 2
 # test3
-test_notify
