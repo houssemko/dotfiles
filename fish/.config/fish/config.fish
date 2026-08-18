@@ -76,6 +76,12 @@ function dots --description "Sync dotfiles and push to remote. Use 'dots --watch
             return 1
         end
     end
+
+    # Recreate symlinks via stow
+    for dir in $dotfiles_dir/*/
+        set -l pkg (basename $dir)
+        stow -d $dotfiles_dir --target ~/.config $pkg 2>/dev/null
+    end
 end
 
 # System update
