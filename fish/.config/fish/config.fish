@@ -27,16 +27,10 @@ abbr fi flatpak install
 abbr fu flatpak uninstall
 
 function dots
-    if test "$argv[1]" != "--once"
+    if test "$argv[1]" = "--watch"
         if not command -q inotifywait
             echo "inotifywait not found. Install inotify-tools: pacman -Sy inotify-tools"
             return 1
-        end
-
-        if test -f /tmp/.dots_watcher_pid
-            set -l old_pid (cat /tmp/.dots_watcher_pid)
-            kill $old_pid 2>/dev/null
-            rm -f /tmp/.dots_watcher_pid
         end
 
         set -l pkg_dirs
@@ -47,10 +41,7 @@ function dots
         end
         test (count $pkg_dirs) -eq 0; and echo "No packages to watch"; and return 1
 
-        dots-watch $pkg_dirs >> ~/.dotfiles/watcher.log 2>&1 &
-        disown
-        echo $last_pid > /tmp/.dots_watcher_pid
-        echo "Dots watcher started (pid $last_pid), logging to ~/.dotfiles/watcher.log"
+        dots-watch --foreground $pkg_dirs
         return
     end
 
@@ -63,8 +54,11 @@ function dots
         echo "No changes to commit"
     else
         git -C ~/.dotfiles commit -m "update configs"
-        git -C ~/.dotfiles push
-        echo "Configs updated and pushed"
+        if git -C ~/.dotfiles push
+            echo "Configs updated and pushed"
+        else
+            echo "Commit created, push failed (run 'git pull' in ~/.dotfiles)"
+        end
     end
 end
 
