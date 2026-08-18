@@ -73,6 +73,7 @@ trap cleanup EXIT INT TERM
 # Initial status check
 sync_config_to_dotfiles
 git_sync_and_push || true
+recreate_symlinks
 
 # Watch for changes (debounced)
 inotifywait -qmr -e create -e modify -e delete -e move --exclude '\.git/' "${DIRS[@]}" |
