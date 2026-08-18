@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Watch dotfiles for changes and auto-commit+push
+# Watch dotfiles + config dirs for changes and auto-commit+push
 # Usage: dots-watch <dir1> [dir2] [dir3] ...
 
 DIRS=("$@")
@@ -17,6 +17,14 @@ while read -r path event file; do
 
     (
         sleep 2
+        # Adopt new files from .config into stow packages
+        for pkg_dir in "$HOME"/.dotfiles/*/; do
+            pkg=$(basename "$pkg_dir")
+            src="$HOME/.config/$pkg"
+            if [[ -d "$src" ]]; then
+                stow -d "$HOME/.dotfiles" --target "$HOME/.config" --adopt "$pkg" 2>/dev/null || true
+            fi
+        done
         git -C "$HOME/.dotfiles" add -A
         git -C "$HOME/.dotfiles" diff --cached --quiet || {
             git -C "$HOME/.dotfiles" commit -m "update configs"
