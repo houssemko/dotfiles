@@ -58,8 +58,14 @@ function dots
         stow -d ~/.dotfiles --target ~/.config --adopt (basename "$dir") 2>/dev/null; or true
     end
     git -C ~/.dotfiles add -A
-    git -C ~/.dotfiles commit -m "update configs"
-    git -C ~/.dotfiles push
+
+    if git -C ~/.dotfiles diff --cached --quiet
+        echo "No changes to commit"
+    else
+        git -C ~/.dotfiles commit -m "update configs"
+        git -C ~/.dotfiles push
+        echo "Configs updated and pushed"
+    end
 end
 
 # System update
