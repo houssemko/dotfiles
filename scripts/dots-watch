@@ -31,10 +31,12 @@ sync_config_to_dotfiles
 git -C "$HOME/.dotfiles" add -A
 if git -C "$HOME/.dotfiles" diff --cached --quiet; then
     echo "No changes to commit"
+    notify-send "dots" "No changes to commit" 2>/dev/null
 else
     git -C "$HOME/.dotfiles" commit -m "update configs"
     git -C "$HOME/.dotfiles" push
     echo "Configs updated and pushed"
+    notify-send "dots" "Configs updated and pushed" 2>/dev/null
 fi
 
 cleanup() {
