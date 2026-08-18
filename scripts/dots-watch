@@ -28,7 +28,7 @@ recreate_symlinks() {
     for pkg_dir in "$DOTFILES_DIR"/*/; do
         [[ "$(basename "$pkg_dir")" == ".git" ]] && continue
         pkg=$(basename "$pkg_dir")
-        stow -d "$DOTFILES_DIR" --target "$HOME/.config" "$pkg" 2>/dev/null || true
+        stow -d "$DOTFILES_DIR" --target "$HOME" "$pkg" 2>/dev/null || true
     done
 }
 
