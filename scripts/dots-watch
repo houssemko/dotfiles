@@ -83,11 +83,13 @@ while read -r path event file; do
         sleep 2
         sync_config_to_dotfiles
         git_sync_and_push
+        recreate_symlinks
     else
         (
             sleep 2
             sync_config_to_dotfiles
             git_sync_and_push
+            recreate_symlinks
         ) >> "$LOG_FILE" 2>&1 &
         SLEEP_PID=$!
     fi
