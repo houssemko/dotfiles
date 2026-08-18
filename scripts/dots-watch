@@ -51,7 +51,6 @@ git_sync_and_push() {
         log "Configs updated and pushed"
     else
         log "Commit created, push failed (run 'git pull' in $DOTFILES_DIR)"
-        notify "Commit created, push failed"
         return 1
     fi
 }
