@@ -27,6 +27,20 @@ abbr fi flatpak install
 abbr fu flatpak uninstall
 
 function dots
+    if test "$argv[1]" = "--watch"
+        if not command -q inotifywait
+            echo "inotifywait not found. Install inotify-tools: paru -S inotify-tools"
+            return 1
+        end
+
+        echo "Watching ~/.config for changes... (Ctrl+C to stop)"
+        inotifywait -m -r ~/.config -e create -e modify -e delete -e move |
+            while read -l path event file
+                dots
+            end
+        return
+    end
+
     for pkg in (ls ~/.dotfiles/)
         if test -d ~/.dotfiles/$pkg
             stow -d ~/.dotfiles --target ~/.config --adopt $pkg 2>/dev/null; or true
@@ -36,19 +50,6 @@ function dots
     git -C ~/.dotfiles add -A
     git -C ~/.dotfiles commit -m "update configs"
     git -C ~/.dotfiles push
-end
-
-function dots-watch
-    if not command -q inotifywait
-        echo "inotifywait not found. Install inotify-tools: paru -S inotify-tools"
-        return 1
-    end
-
-    echo "Watching ~/.config for changes... (Ctrl+C to stop)"
-    inotifywait -m -r ~/.config -e create -e modify -e delete -e move |
-        while read -l path event file
-            dots
-        end
 end
 
 # System update
