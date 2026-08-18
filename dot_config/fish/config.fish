@@ -27,35 +27,17 @@ abbr fi flatpak install
 abbr fu flatpak uninstall
 
 function dots --description "Capture dotfile changes with chezmoi and push."
-    argparse 'dry-run' 'verbose' 'no-git' 'watch' -- $argv
+    chezmoi re-add
     or return 1
 
-    if set -q _flag_watch
-        chezmoi watch
-        return
-    end
-
-    set -l readd_args
-    set -q _flag_dry_run; and set -a readd_args --dry-run
-    set -q _flag_verbose; and set -a readd_args --verbose
-
-    chezmoi re-add $readd_args
+    chezmoi git -- add -A
     or return 1
 
-    if not set -q _flag_no_git
-        if set -q _flag_dry_run
-            echo "DRY RUN: would commit and push"
-        else
-            chezmoi git -- add -A
-            or return 1
-
-            if chezmoi git -- diff --cached --quiet
-                echo "No changes to commit"
-            else
-                chezmoi git -- commit -m "update configs"
-                and chezmoi git -- push
-            end
-        end
+    if chezmoi git -- diff --cached --quiet
+        echo "No changes to commit"
+    else
+        chezmoi git -- commit -m "update configs"
+        and chezmoi git -- push
     end
 end
 

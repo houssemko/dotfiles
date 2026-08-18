@@ -26,9 +26,6 @@ chezmoi init --apply https://github.com/houssemko/dotfiles.git
 
 ```bash
 dots                  # capture changes and push (same as: chezmoi re-add && git commit && git push)
-dots --dry-run        # preview what would be captured
-dots --no-git         # capture changes without committing
-dots --watch          # watch the source dir and apply changes automatically
 chezmoi apply         # apply the source state to this machine
 chezmoi update        # pull the latest source and apply
 chezmoi cd            # jump into the source dir
