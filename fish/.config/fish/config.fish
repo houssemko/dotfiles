@@ -28,10 +28,12 @@ abbr fu flatpak uninstall
 
 function dots
     function _dots_stow -a pkg
+        touch /tmp/.dots_lock
         stow -d ~/.dotfiles --target ~/.config --adopt "$pkg"
         git -C ~/.dotfiles add -A
         git -C ~/.dotfiles commit -m "update $pkg"
         git -C ~/.dotfiles push
+        rm -f /tmp/.dots_lock
     end
 
     if test "$argv[1]" != "--once"
@@ -43,6 +45,8 @@ function dots
         echo "Watching ~/.config for changes... (Ctrl+C to stop)"
         inotifywait -m -r ~/.config -e create -e modify -e delete -e move |
             while read -l path event file
+                test -f /tmp/.dots_lock; and continue
+
                 set -l rel (string replace -r "^$HOME/.config/?" "" "$path$file")
                 set -l pkg (string split / -- "$rel")[1]
                 test -z "$pkg"; and continue
