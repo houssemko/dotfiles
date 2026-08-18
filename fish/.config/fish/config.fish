@@ -111,7 +111,6 @@ function up
 
     echo "----------------------------------------"
     set_color --bold green
-    
     echo "✔ System update complete!"
     set_color normal
 end
