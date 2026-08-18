@@ -26,50 +26,31 @@ abbr gc git clone
 abbr fi flatpak install
 abbr fu flatpak uninstall
 
-function dots --description "Sync dotfiles and push to remote. Use 'dots --watch' for live watching."
-    argparse 'dry-run' 'verbose' 'no-git' 'watch' 'debounce=' -- $argv
+function dots --description "Capture dotfile changes with chezmoi and push. Use 'dots --watch' to watch the source dir."
+    argparse 'dry-run' 'verbose' 'no-git' 'watch' -- $argv
     or return 1
 
-    set -l debounce
-    if set -q _flag_debounce
-        set debounce $_flag_debounce
-    else
-        set debounce 2
-    end
-
     if set -q _flag_watch
-        if not command -q inotifywait
-            echo "inotifywait not found. Install inotify-tools: pacman -Sy inotify-tools"
-            return 1
-        end
-
-        set -l pkg_dirs
-        for dir in ~/.dotfiles/*/
-            set -l pkg (basename "$dir")
-            contains -- "$pkg" .git scripts; and continue
-            set -a pkg_dirs $dir
-            test -d ~/.config/$pkg; and set -a pkg_dirs ~/.config/$pkg
-        end
-
-        if test (count $pkg_dirs) -eq 0
-            echo "No packages to watch"
-            return 1
-        end
-
-        set -l extra_args
-        set -q _flag_no_git; and set -a extra_args --no-git
-        test "$debounce" != 2; and set -a extra_args --debounce $debounce
-
-        dots-watch --foreground $extra_args $pkg_dirs
+        chezmoi watch
         return
     end
 
-    set -l sync_args
-    set -q _flag_dry_run; and set -a sync_args --dry-run
-    set -q _flag_verbose; and set -a sync_args --verbose
-    set -q _flag_no_git; and set -a sync_args --no-git
+    set -l readd_args
+    set -q _flag_dry_run; and set -a readd_args --dry-run
+    set -q _flag_verbose; and set -a readd_args --verbose
 
-    dots-sync $sync_args
+    chezmoi re-add $readd_args
+    or return 1
+
+    if not set -q _flag_no_git
+        if set -q _flag_dry_run
+            echo "DRY RUN: would commit and push"
+        else
+            chezmoi git add -A
+            and chezmoi git commit -m "update configs"
+            and chezmoi git push
+        end
+    end
 end
 
 # System update
