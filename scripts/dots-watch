@@ -38,6 +38,10 @@ else
 fi
 
 cleanup() {
+    [[ -n "$SLEEP_PID" ]] && kill "$SLEEP_PID" 2>/dev/null
+    exit 0
+}
+trap cleanup EXIT INT TERM
 
 inotifywait -qmr -e create -e modify -e delete -e move --exclude '\.git/' "${DIRS[@]}" |
 while read -r path event file; do
