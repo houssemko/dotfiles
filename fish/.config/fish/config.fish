@@ -27,45 +27,40 @@ abbr fi flatpak install
 abbr fu flatpak uninstall
 
 function dots
-    function _dots_stow -a pkg
-        touch /tmp/.dots_lock
-        stow -d ~/.dotfiles --target ~/.config --adopt "$pkg"
-        git -C ~/.dotfiles add -A
-        git -C ~/.dotfiles commit -m "update $pkg"
-        git -C ~/.dotfiles push
-        rm -f /tmp/.dots_lock
-    end
-
     if test "$argv[1]" != "--once"
         if not command -q inotifywait
             echo "inotifywait not found. Install inotify-tools: paru -S inotify-tools"
             return 1
         end
 
-        echo "Watching ~/.config for changes... (Ctrl+C to stop)"
-        inotifywait -q -m -r ~/.config -e create -e modify -e delete -e move |
+        set -l pkg_dirs
+        for dir in ~/.dotfiles/*/
+            set -a pkg_dirs $dir
+        end
+        test (count $pkg_dirs) -eq 0; and echo "No packages to watch"; and return 1
+
+        rm -f /tmp/.dots_pid
+
+        echo "Watching for changes... (Ctrl+C to stop)"
+        inotifywait -qmr -e create -e modify -e delete -e move --exclude '(\.git/|\.git$)' $pkg_dirs |
             while read -l path event file
-                test -f /tmp/.dots_lock; and continue
-
-                set -l rel (string replace -r "^$HOME/.config/?" "" "$path$file")
-                set -l pkg (string split / -- "$rel")[1]
-                test -z "$pkg"; and continue
-
-                if test -d "$HOME/.dotfiles/$pkg"
-                    _dots_stow $pkg
-                else if test -d "$HOME/.config/$pkg"
-                    echo "New config detected: $pkg — initializing dotfiles package"
-                    mkdir -p "$HOME/.dotfiles/$pkg/.config/$pkg"
-                    cp -a "$HOME/.config/$pkg/." "$HOME/.dotfiles/$pkg/.config/$pkg/"
-                    _dots_stow $pkg
+                if test -f /tmp/.dots_pid
+                    set -l old_pid (cat /tmp/.dots_pid)
+                    kill $old_pid 2>/dev/null
                 end
+
+                bash -c 'sleep 2; git -C ~/.dotfiles add -A; git -C ~/.dotfiles diff --cached --quiet || (git -C ~/.dotfiles commit -m "update configs" && git -C ~/.dotfiles push)' &
+                echo $last_pid > /tmp/.dots_pid
             end
         return
     end
 
-    for pkg in (ls ~/.dotfiles/)
-        test -d ~/.dotfiles/$pkg; and _dots_stow $pkg
+    for dir in ~/.dotfiles/*/
+        stow -d ~/.dotfiles --target ~/.config --adopt (basename "$dir") 2>/dev/null; or true
     end
+    git -C ~/.dotfiles add -A
+    git -C ~/.dotfiles commit -m "update configs"
+    git -C ~/.dotfiles push
 end
 
 # System update
@@ -169,3 +164,4 @@ set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
 # Added by Antigravity CLI installer
 set -gx PATH "/home/houssem/.local/bin" $PATH
 
+test
