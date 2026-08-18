@@ -42,6 +42,8 @@ function dots
         set -l pkg_dirs
         for dir in ~/.dotfiles/*/
             set -a pkg_dirs $dir
+            set -l pkg (basename "$dir")
+            test -d ~/.config/$pkg; and set -a pkg_dirs ~/.config/$pkg
         end
         test (count $pkg_dirs) -eq 0; and echo "No packages to watch"; and return 1
 
