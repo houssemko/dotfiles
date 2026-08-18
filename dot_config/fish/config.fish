@@ -46,9 +46,9 @@ function dots --description "Capture dotfile changes with chezmoi and push. Use 
         if set -q _flag_dry_run
             echo "DRY RUN: would commit and push"
         else
-            chezmoi git add -A
-            and chezmoi git commit -m "update configs"
-            and chezmoi git push
+            chezmoi git -- add -A
+            and chezmoi git -- commit -m "update configs"
+            and chezmoi git -- push
         end
     end
 end
