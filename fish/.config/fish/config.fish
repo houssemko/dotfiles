@@ -47,10 +47,7 @@ function dots
         end
         test (count $pkg_dirs) -eq 0; and echo "No packages to watch"; and return 1
 
-        dots-watch $pkg_dirs >> ~/.dotfiles/watcher.log 2>&1 &
-        disown
-        echo $last_pid > /tmp/.dots_watcher_pid
-        echo "Dots watcher started (pid $last_pid), logging to ~/.dotfiles/watcher.log"
+        dots-watch $pkg_dirs
         return
     end
 
