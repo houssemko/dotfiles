@@ -27,38 +27,17 @@ abbr fi flatpak install
 abbr fu flatpak uninstall
 
 function dots --description "Sync dotfiles and push to remote. Use 'dots --watch' for live watching."
-    # Parse flags
-    set -l dry_run false
-    set -l verbose false
-    set -l no_git false
-    set -l watch false
-    set -l debounce 2
-    set -l watch_args
-    set -l prev_arg ""
+    argparse 'dry-run' 'verbose' 'no-git' 'watch' 'debounce=' -- $argv
+    or return 1
 
-    for arg in $argv
-        switch $arg
-            case --dry-run
-                set dry_run true
-            case --verbose
-                set verbose true
-            case --no-git
-                set no_git true
-            case --watch
-                set watch true
-            case --debounce
-                # Next arg will be the value
-            case '*'
-                if test "$prev_arg" = "--debounce"
-                    set debounce $arg
-                else
-                    set -a watch_args $arg
-                end
-        end
-        set prev_arg $arg
+    set -l debounce
+    if set -q _flag_debounce
+        set debounce $_flag_debounce
+    else
+        set debounce 2
     end
 
-    if test "$watch" = "true"
+    if set -q _flag_watch
         if not command -q inotifywait
             echo "inotifywait not found. Install inotify-tools: pacman -Sy inotify-tools"
             return 1
@@ -67,37 +46,30 @@ function dots --description "Sync dotfiles and push to remote. Use 'dots --watch
         set -l pkg_dirs
         for dir in ~/.dotfiles/*/
             set -l pkg (basename "$dir")
-            # Skip .git and scripts packages
-            test "$pkg" = ".git"; and continue
-            test "$pkg" = "scripts"; and continue
+            contains -- "$pkg" .git scripts; and continue
             set -a pkg_dirs $dir
             test -d ~/.config/$pkg; and set -a pkg_dirs ~/.config/$pkg
         end
-        test (count $pkg_dirs) -eq 0; and echo "No packages to watch"; and return 1
 
-        set -l watch_cmd "dots-watch --foreground"
-        if test "$no_git" = "true"
-            set -a watch_cmd --no-git
+        if test (count $pkg_dirs) -eq 0
+            echo "No packages to watch"
+            return 1
         end
-        if test "$debounce" != "2"
-            set -a watch_cmd --debounce $debounce
-        end
-        set -a watch_cmd $pkg_dirs
-        eval $watch_cmd
+
+        set -l extra_args
+        set -q _flag_no_git; and set -a extra_args --no-git
+        test "$debounce" != 2; and set -a extra_args --debounce $debounce
+
+        dots-watch --foreground $extra_args $pkg_dirs
         return
     end
 
-    set -l sync_cmd "dots-sync"
-    if test "$dry_run" = "true"
-        set -a sync_cmd --dry-run
-    end
-    if test "$verbose" = "true"
-        set -a sync_cmd --verbose
-    end
-    if test "$no_git" = "true"
-        set -a sync_cmd --no-git
-    end
-    eval $sync_cmd
+    set -l sync_args
+    set -q _flag_dry_run; and set -a sync_args --dry-run
+    set -q _flag_verbose; and set -a sync_args --verbose
+    set -q _flag_no_git; and set -a sync_args --no-git
+
+    dots-sync $sync_args
 end
 
 # System update
