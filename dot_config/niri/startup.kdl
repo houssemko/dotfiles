@@ -1,0 +1,9 @@
+// Startup Daemons & Core Desktop Shell Services
+// On-screen keyboard: auto pops up when a text field is activated (mouse click), hides when focus leaves it.
+// --non-exclusive: overlays on top of windows instead of reserving space. Colors match the cos-niri theme
+// (surface #12131a at 72% alpha, primary #b4c5ff). 8-digit hex = rrggbbaa.
+spawn-at-startup "wvkbd-mobintl" "--auto" "--non-exclusive" "--bg" "12131ab8" "--fg" "2b2c36" "--fg-sp" "b4c5ff" "--press" "3d3f4d" "--press-sp" "8b9ff0" "--text" "ffffff" "--text-sp" "1a1b38" "--text-press" "ffffff" "--text-press-sp" "1a1b38"
+spawn-at-startup "cos-niri-bar"
+spawn-at-startup "swaync"
+spawn-sh-at-startup "swaybg -i ~/.config/background -m fill"
+spawn-sh-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1 || /usr/libexec/polkit-mate-authentication-agent-1 || /usr/lib/polkit-kde-authentication-agent-1"
