@@ -5,6 +5,6 @@
 set -euo pipefail
 
 # shellcheck source=/home/houssem/.dotfiles/scripts/dots-sync.lib.sh
-source "$(dirname "${BASH_SOURCE[0]}")/dots-sync.lib.sh"
+source "/home/houssem/.dotfiles/scripts/dots-sync.lib.sh"
 
 full_sync
