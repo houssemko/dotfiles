@@ -172,5 +172,3 @@ set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
 # Added by Antigravity CLI installer
 set -gx PATH "/home/houssem/.local/bin" $PATH
 
-# Secrets live outside the synced dotfiles (see ~/.config/fish-secrets.fish)
-test -f ~/.config/fish-secrets.fish; and source ~/.config/fish-secrets.fish
