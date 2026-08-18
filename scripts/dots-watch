@@ -48,17 +48,22 @@ INOTIFY_PID=""
 cleanup() {
     log "Shutting down watcher..."
     [[ -n "$INOTIFY_PID" ]] && kill "$INOTIFY_PID" 2>/dev/null || true
+    [[ -n "$FIFO" && -p "$FIFO" ]] && rm -f "$FIFO"
     release_lock
     exit 0
 }
 trap cleanup EXIT INT TERM
 
-# Watch for changes (debounced)
-inotifywait -qmr -e create -e modify -e delete -e move --exclude '\.git/' "${DIRS[@]}" &
+# Create FIFO for inotifywait output
+FIFO=$(mktemp -u)
+mkfifo "$FIFO"
+
+# Watch for changes (debounced) - output to FIFO
+inotifywait -qmr -e create -e modify -e delete -e move --exclude '\.git/' "${DIRS[@]}" >"$FIFO" &
 INOTIFY_PID=$!
 
 while read -r path event file; do
     log "Change detected: $path$file ($event)"
     sleep "$DEBOUNCE"
     full_sync || log "Sync failed, continuing..."
-done < <(wait $INOTIFY_PID) || { release_lock; exit 1; }
+done <"$FIFO" || { release_lock; exit 1; }

@@ -48,16 +48,21 @@ release_lock() {
 
 recreate_symlinks() {
     local pkg
+    local pkg_dir
     for pkg_dir in "$DOTFILES_DIR"/*/; do
         [[ "$(basename "$pkg_dir")" == ".git" ]] && continue
         [[ "$(basename "$pkg_dir")" == "scripts" ]] && continue
         pkg=$(basename "$pkg_dir")
-        stow -d "$DOTFILES_DIR" --target "$HOME" "$pkg" 2>&1 | grep -v "^$" || true
+        local stow_out
+        if ! stow_out=$(stow -d "$DOTFILES_DIR" --target "$HOME" "$pkg" 2>&1); then
+            log "WARNING: stow conflict for $pkg: $stow_out"
+        fi
     done
 }
 
 sync_config_to_dotfiles() {
     local pkg src dst
+    local pkg_dir
     for pkg_dir in "$DOTFILES_DIR"/*/; do
         [[ "$(basename "$pkg_dir")" == ".git" ]] && continue
         [[ "$(basename "$pkg_dir")" == "scripts" ]] && continue
@@ -103,7 +108,7 @@ full_sync() {
         if [[ $dry_run -eq 1 ]]; then
             log "DRY RUN: would commit and push"
         else
-            git_sync_and_push
+            git_sync_and_push || log "Push failed, will still recreate symlinks"
         fi
     else
         log "Skipping git (--no-git)"
