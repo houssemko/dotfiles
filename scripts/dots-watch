@@ -4,85 +4,36 @@
 
 set -euo pipefail
 
+# shellcheck source=/home/houssem/.dotfiles/scripts/dots-sync.lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/dots-sync.lib.sh"
+
 DIRS=("$@")
 FOREGROUND=false
-DOTFILES_DIR="$HOME/.dotfiles"
-LOG_FILE="$DOTFILES_DIR/watcher.log"
-SLEEP_PID=""
+INOTIFY_PID=""
 
 if [[ "${DIRS[0]}" == "--foreground" ]]; then
     FOREGROUND=true
     DIRS=("${DIRS[@]:1}")
 fi
 
-log() { echo "$1"; }
+# Initial sync
+full_sync || true
 
-recreate_symlinks() {
-    local pkg
-    for pkg_dir in "$DOTFILES_DIR"/*/; do
-        [[ "$(basename "$pkg_dir")" == ".git" ]] && continue
-        pkg=$(basename "$pkg_dir")
-        stow -d "$DOTFILES_DIR" --target "$HOME" "$pkg" 2>/dev/null || true
-    done
-}
-
-sync_config_to_dotfiles() {
-    local pkg src dst
-    for pkg_dir in "$DOTFILES_DIR"/*/; do
-        [[ "$(basename "$pkg_dir")" == ".git" ]] && continue
-        pkg=$(basename "$pkg_dir")
-        src="$HOME/.config/$pkg"
-        dst="$DOTFILES_DIR/$pkg/.config/$pkg"
-        [[ -d "$src" ]] || continue
-        mkdir -p "$dst"
-        cp -ru "$src/." "$dst/" 2>/dev/null || true
-    done
-}
-
-git_sync_and_push() {
-    git -C "$DOTFILES_DIR" add -A
-    if git -C "$DOTFILES_DIR" diff --cached --quiet; then
-        log "No changes to commit"
-        return 0
-    fi
-    git -C "$DOTFILES_DIR" commit -m "update configs" >/dev/null
-    if git -C "$DOTFILES_DIR" pull --rebase --autostash 2>/dev/null && \
-       git -C "$DOTFILES_DIR" push 2>&1; then
-        log "Configs updated and pushed"
-    else
-        log "Commit created, push failed (run 'git pull' in $DOTFILES_DIR)"
-        return 1
-    fi
-}
-
+# Trap to clean up inotifywait
 cleanup() {
-    [[ -n "$SLEEP_PID" ]] && kill "$SLEEP_PID" 2>/dev/null || true
+    log "Shutting down watcher..."
+    [[ -n "$INOTIFY_PID" ]] && kill "$INOTIFY_PID" 2>/dev/null || true
+    release_lock
     exit 0
 }
 trap cleanup EXIT INT TERM
 
-# Initial status check
-sync_config_to_dotfiles
-git_sync_and_push || true
-recreate_symlinks
-
 # Watch for changes (debounced)
-inotifywait -qmr -e create -e modify -e delete -e move --exclude '\.git/' "${DIRS[@]}" |
-while read -r path event file; do
-    [[ -n "$SLEEP_PID" ]] && kill "$SLEEP_PID" 2>/dev/null && wait "$SLEEP_PID" 2>/dev/null || true
+inotifywait -qmr -e create -e modify -e delete -e move --exclude '\.git/' "${DIRS[@]}" &
+INOTIFY_PID=$!
 
-    if [[ "$FOREGROUND" == "true" ]]; then
-        sleep 2
-        sync_config_to_dotfiles
-        git_sync_and_push
-        recreate_symlinks
-    else
-        (
-            sleep 2
-            sync_config_to_dotfiles
-            git_sync_and_push
-            recreate_symlinks
-        ) >> "$LOG_FILE" 2>&1 &
-        SLEEP_PID=$!
-    fi
-done
+while read -r path event file; do
+    log "Change detected: $path$file ($event)"
+    sleep 2
+    full_sync || log "Sync failed, continuing..."
+done < <(wait $INOTIFY_PID)

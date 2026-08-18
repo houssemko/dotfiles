@@ -35,8 +35,11 @@ function dots --description "Sync dotfiles and push to remote. Use 'dots --watch
 
         set -l pkg_dirs
         for dir in ~/.dotfiles/*/
-            set -a pkg_dirs $dir
             set -l pkg (basename "$dir")
+            # Skip .git and scripts packages
+            test "$pkg" = ".git"; and continue
+            test "$pkg" = "scripts"; and continue
+            set -a pkg_dirs $dir
             test -d ~/.config/$pkg; and set -a pkg_dirs ~/.config/$pkg
         end
         test (count $pkg_dirs) -eq 0; and echo "No packages to watch"; and return 1
@@ -45,43 +48,7 @@ function dots --description "Sync dotfiles and push to remote. Use 'dots --watch
         return
     end
 
-    set -l dotfiles_dir ~/.dotfiles
-    set -l log_file "$dotfiles_dir/watcher.log"
-
-    if not test -d "$dotfiles_dir"
-        echo "Dotfiles directory not found: $dotfiles_dir"
-        return 1
-    end
-
-    # Sync config -> dotfiles repo
-    for dir in $dotfiles_dir/*/
-        set -l pkg (basename $dir)
-        if test -d ~/.config/$pkg
-            set -l dst $dir/.config/$pkg
-            mkdir -p $dst
-            cp -ru ~/.config/$pkg/. $dst/ 2>/dev/null
-        end
-    end
-
-    git -C $dotfiles_dir add -A
-
-    if git -C $dotfiles_dir diff --cached --quiet
-        echo "No changes to commit"
-    else
-        git -C $dotfiles_dir commit -m "update configs" >/dev/null
-        if git -C $dotfiles_dir pull --rebase --autostash 2>/dev/null; and git -C $dotfiles_dir push
-            echo "Configs updated and pushed"
-        else
-            echo "Commit created, push failed (run 'git pull' in $dotfiles_dir)"
-            return 1
-        end
-    end
-
-    # Recreate symlinks via stow
-    for dir in $dotfiles_dir/*/
-        set -l pkg (basename $dir)
-        stow -d $dotfiles_dir --target ~ $pkg 2>/dev/null
-    end
+    dots-sync
 end
 
 # System update
@@ -181,3 +148,11 @@ end
 # Use fd as the default fzf command
 set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
 
+<<<<<<< HEAD
+=======
+# Added by Antigravity CLI installer
+set -gx PATH "/home/houssem/.local/bin" $PATH
+
+# Secrets live outside the synced dotfiles (see ~/.config/fish-secrets.fish)
+test -f ~/.config/fish-secrets.fish; and source ~/.config/fish-secrets.fish
+>>>>>>> 816ed99 (update configs)
