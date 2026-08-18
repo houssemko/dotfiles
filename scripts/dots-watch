@@ -32,8 +32,7 @@ sync_config_to_dotfiles() {
         dst="$DOTFILES_DIR/$pkg/.config/$pkg"
         [[ -d "$src" ]] || continue
         mkdir -p "$dst"
-        rsync -a --update --exclude='cache/' --exclude='__pycache__/' \
-            --exclude='.git/' "$src/" "$dst/"
+        cp -ru "$src/." "$dst/" 2>/dev/null || true
     done
 }
 
