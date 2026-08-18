@@ -29,7 +29,7 @@ abbr fu flatpak uninstall
 function dots
     if test "$argv[1]" != "--once"
         if not command -q inotifywait
-            echo "inotifywait not found. Install inotify-tools: paru -Sy inotify-tools"
+            echo "inotifywait not found. Install inotify-tools: pacman -Sy inotify-tools"
             return 1
         end
 
