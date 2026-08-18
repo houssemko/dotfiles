@@ -173,6 +173,3 @@ set -gx PATH "/home/houssem/.local/bin" $PATH
 # bg test 2
 # test3
 test
-fresh_test_final
-fresh_test_final2
-fresh_test_final3
