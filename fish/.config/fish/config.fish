@@ -154,3 +154,4 @@ set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
 set -gx PATH "/home/houssem/.local/bin" $PATH
 test
 # test
+test
