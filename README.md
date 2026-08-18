@@ -1,6 +1,6 @@
 # dotfiles
 
-My personal config files managed with [GNU Stow](https://www.gnu.org/software/stow/).
+My personal config files managed with [chezmoi](https://www.chezmoi.io/).
 
 ## Apps
 
@@ -19,28 +19,26 @@ My personal config files managed with [GNU Stow](https://www.gnu.org/software/st
 ## Install
 
 ```bash
-git clone https://github.com/<your-username>/dotfiles.git ~/dotfiles
-cd ~/dotfiles
-
-# Stow everything
-stow */
-
-# Or stow individual apps
-stow ghostty
-stow fish
-stow mpv
+chezmoi init --apply https://github.com/houssemko/dotfiles.git
 ```
 
-## Update
+## Daily operations
 
 ```bash
-cd ~/dotfiles
-stow -R */    # restow all
+dots                  # capture changes and push (same as: chezmoi re-add && git commit && git push)
+dots --dry-run        # preview what would be captured
+dots --no-git         # capture changes without committing
+dots --watch          # watch the source dir and apply changes automatically
+chezmoi apply         # apply the source state to this machine
+chezmoi update        # pull the latest source and apply
+chezmoi cd            # jump into the source dir
 ```
 
-## Unstow
+## Layout
 
-```bash
-cd ~/dotfiles
-stow -D */    # remove all symlinks
-```
+The source dir follows chezmoi conventions:
+
+| Source | Target |
+|--------|--------|
+| `dot_config/fish/config.fish` | `~/.config/fish/config.fish` |
+| `dot_config/fish/private_fish_variables` | `~/.config/fish/fish_variables` (mode 600) |
