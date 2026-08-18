@@ -43,7 +43,6 @@ git_sync_and_push() {
     git -C "$DOTFILES_DIR" add -A
     if git -C "$DOTFILES_DIR" diff --cached --quiet; then
         log "No changes to commit"
-        notify "No changes to commit"
         return 0
     fi
     git -C "$DOTFILES_DIR" commit -m "update configs" >/dev/null
