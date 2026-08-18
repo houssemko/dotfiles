@@ -68,6 +68,6 @@ while read -r path event file; do
                 notify-send "dots" "Commit created, push failed" 2>/dev/null
             fi
         fi
-    ) | cat >> "$HOME/.dotfiles/watcher.log" 2>&1 &
+    ) >> "$HOME/.dotfiles/watcher.log" 2>&1 &
     SLEEP_PID=$!
 done
