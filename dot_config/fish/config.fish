@@ -26,6 +26,7 @@ abbr gc git clone
 abbr fi flatpak install
 abbr fu flatpak uninstall
 
+# Dotfiles sync
 function dots --description "Capture dotfile changes with chezmoi and push."
     chezmoi re-add
     or return 1
