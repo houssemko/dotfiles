@@ -94,37 +94,6 @@ function up
     set_color normal
 end
 
-# Get the fastest mirrors
-function uac --description "Update Chaotic-AUR mirrorlist and refresh repository"
-    # Pre-authorize sudo
-    if not sudo -v
-        echo "Sudo authentication failed."
-        return 1
-    end
-
-    set -l tmpfile (mktemp)
-
-    echo "==> Rating Chaotic-AUR mirrors..."
-    if rate-mirrors --save=$tmpfile --disable-comments-in-file --allow-root --protocol https --per-mirror-timeout 1500 chaotic-aur
-        echo "==> Backing up and updating chaotic-mirrorlist..."
-        sudo mv /etc/pacman.d/chaotic-mirrorlist /etc/pacman.d/chaotic-mirrorlist-backup
-        sudo mv $tmpfile /etc/pacman.d/chaotic-mirrorlist
-        
-        # Clean caches if the command exists/aliased
-        if functions -q ua-drop-caches; or alias -q ua-drop-caches
-            ua-drop-caches
-        end
-
-        echo "==> Syncing database..."
-        paru -Sy --noconfirm
-        echo "✔ Chaotic-AUR mirrorlist updated successfully!"
-    else
-        echo "❌ rate-mirrors failed. Mirrorlist unchanged."
-        rm -f $tmpfile
-        return 1
-    end
-end
-
 # Cleanup local orphaned packages
 function cleanup
     set -l orphans (pacman -Qdtq 2>/dev/null)
