@@ -13,6 +13,7 @@ My personal config files managed with [chezmoi](https://www.chezmoi.io/).
 | ghostty | Terminal emulator |
 | mpv | Media player |
 | niri | Wayland compositor |
+| opencode | AI coding assistant |
 | paru | AUR helper |
 | vivaldi | Browser (config only) |
 | yay | AUR helper |
