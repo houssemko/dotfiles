@@ -1,5 +1,51 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode/deepseek-v4-flash-free",
-  "enabled_providers": ["opencode", "ollama-cloud", "google"]
+  "enabled_providers": ["opencode", "ollama-cloud", "google", "qwen", "cerebras", "groq"],
+
+  "plugin": [
+    [
+      "@razroo/opencode-model-fallback",
+      {
+        "fallback_models": [
+          "opencode/deepseek-v4-flash-free",
+          "groq/openai/gpt-oss-120b",
+          "qwen/qwen3-coder-plus",
+          "cerebras/gpt-oss-120b",
+          "qwen/qwen3.7-flash"
+        ],
+        "cooldown_seconds": 300,
+        "timeout_seconds": 45,
+        "notify_on_fallback": true
+      }
+    ]
+  ],
+
+  "provider": {
+    "qwen": {
+      "npm": "@ai-sdk/alibaba",
+      "name": "Qwen (DashScope)",
+      "options": {
+        "baseURL": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "apiKey": "{env:QWEN_API_KEY}"
+      },
+      "models": {
+        "qwen3-coder-next": { "name": "Qwen3 Coder Next", "tool_call": true },
+        "qwen3-coder-plus": { "name": "Qwen3 Coder Plus", "tool_call": true },
+        "qwen3-coder-flash": { "name": "Qwen3 Coder Flash", "tool_call": true },
+        "qwen3.7-max": { "name": "Qwen3.7 Max", "reasoning": true, "tool_call": true },
+        "qwen3.7-plus": { "name": "Qwen3.7 Plus", "tool_call": true },
+        "qwen3.7-flash": { "name": "Qwen3.7 Flash", "tool_call": true }
+      }
+    }
+  },
+
+  "mcp": {
+    "github": {
+      "type": "remote",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "enabled": true,
+      "headers": { "Authorization": "Bearer {env:GITHUB_TOKEN}" }
+    }
+  }
 }
