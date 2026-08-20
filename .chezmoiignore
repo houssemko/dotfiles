@@ -1,7 +1,10 @@
 README.md
 .gitignore
 *.log
+**/*.log
 **/cache/**
-groq.fish
-cerebras.fish
-qwen.fish
+**/*.bak
+**/node_modules/**
+**/groq.fish
+**/cerebras.fish
+**/qwen.fish
