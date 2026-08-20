@@ -3,3 +3,5 @@ README.md
 *.log
 **/cache/**
 groq.fish
+cerebras.fish
+qwen.fish
