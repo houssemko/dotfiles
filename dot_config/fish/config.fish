@@ -6,11 +6,6 @@ abbr ve pacman -Qs
 abbr ff fastfetch
 abbr se paru -Ss
 
-function cl
-    paru -Scc
-    sudo find /var/cache/pacman/pkg -name 'download-*' -delete 2>/dev/null
-end
-
 abbr in sudo pacman -Sy
 abbr ins paru -Sy --noconfirm
 abbr rem sudo pacman -Runs
@@ -26,85 +21,6 @@ abbr gc git clone
 abbr fi flatpak install
 abbr fu flatpak uninstall
 
-# Dotfiles sync
-function dots --description "Capture dotfile changes with chezmoi and push."
-    chezmoi re-add
-    or return 1
-
-    chezmoi git -- add -A
-    or return 1
-
-    if chezmoi git -- diff --cached --quiet 2>/dev/null
-        echo "No changes to commit"
-    else
-        chezmoi git -- commit -m "update configs"
-        and chezmoi git -- push
-    end
-end
-
-# System update
-function up 
-    function _up_header -a text
-        set_color --bold cyan
-        echo -e "\n==> $text"
-        set_color normal
-    end
-
-    _up_header "Updating System & AUR Packages"
-    if command -q paru
-        paru -Syu --noconfirm
-    else
-        echo "paru not found, falling back to pacman..."
-        sudo pacman -Syu --noconfirm
-    end
-
-    if command -q flatpak
-        _up_header "Updating Flatpaks"
-        flatpak update -y
-    end
-    
-    _up_header "Checking for .pacnew / .pacsave files"
-    set -l pacnew_files (find /etc -type f -name "*.pacnew" -o -name "*.pacsave" 2>/dev/null)
-    if test -n "$pacnew_files"
-        set_color yellow
-        echo "Warning: Configuration files require merging:"
-        for file in $pacnew_files
-            echo "  -> $file"
-        end
-        set_color normal
-    else
-        echo "No configuration files require merging."
-    end
-
-    _up_header "Checking for Failed Systemd Services"
-    set -l failed_services (systemctl --failed --plain --no-legend)
-    if test -n "$failed_services"
-        set_color red
-        echo "Warning: The following services have failed:"
-        systemctl --failed
-        set_color normal
-    else
-        set_color green
-        echo "All systemd services are running normally."
-        set_color normal
-    end
-
-    echo "----------------------------------------"
-    set_color --bold green
-    echo "✔ System update complete!"
-    set_color normal
-end
-
-# Cleanup local orphaned packages
-function cleanup
-    set -l orphans (pacman -Qdtq 2>/dev/null)
-    if test -n "$orphans"
-        sudo pacman -R $orphans
-    else
-        echo "No orphaned packages"
-    end
-end
-      
 # Use fd as the default fzf command
 set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
 
