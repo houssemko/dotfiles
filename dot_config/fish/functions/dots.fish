@@ -1,4 +1,7 @@
 function dots --description "Capture dotfile changes with chezmoi and push."
+    chezmoi add ~/.config/fish/functions
+    or return 1
+
     chezmoi re-add
     or return 1
 
