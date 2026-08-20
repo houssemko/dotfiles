@@ -1,6 +1,7 @@
 function dots --description "Capture dotfile changes with chezmoi and push."
-    chezmoi add ~/.config/fish/functions
-    or return 1
+    for dir in (chezmoi managed -i dirs | string match -r '^[^/]+/[^/]+$' | sort -u)
+        chezmoi add ~/$dir
+    end
 
     chezmoi re-add
     or return 1
