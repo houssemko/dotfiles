@@ -19,9 +19,7 @@ window-inherit-working-directory = true
 
 # --- Behavior ---
 # Copy selected text to both Linux's primary selection and regular clipboard
-copy-on-select = clipboard
-# Ask before closing a window with a running process
-confirm-close-surface = true
+copy-on-select = true
 
 # Cursor Configuration
 cursor-style = bar
