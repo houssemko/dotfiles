@@ -1,8 +1,8 @@
-function cleanup
-    set -l orphans (pacman -Qdtq 2>/dev/null)
+function cleanup --description 'Remove orphan packages'
+    set -l orphans (pacman -Qtdq)
     if test -n "$orphans"
-        sudo pacman -R $orphans
+        sudo pacman -Rns $orphans
     else
-        echo "No orphaned packages"
+        echo "Nothing to clean."
     end
 end
