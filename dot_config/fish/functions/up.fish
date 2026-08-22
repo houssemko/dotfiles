@@ -46,13 +46,6 @@ function up
 
     set -l start (date +%s)
 
-    set_color --bold cyan
-    echo
-    echo "╭────────────────────────────────────────────────────╮"
-    echo "│ SYSTEM UPDATE                                      │"
-    echo "╰────────────────────────────────────────────────────╯"
-    set_color normal
-
     _up_header "System & AUR Packages"
 
     if command -q paru
