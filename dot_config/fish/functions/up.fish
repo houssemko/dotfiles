@@ -1,44 +1,39 @@
-function up --description 'Update the system and check maintenance tasks (topgrade-style)'
+function up --description 'Update system and check maintenance (topgrade-style)'
     set -l start (date +%s)
     set -g _up_names
     set -g _up_status
 
     # Message helpers, styled after topgrade
     # https://github.com/topgrade-rs/topgrade
-    function _up_header -a color msg
-        set -l w 80
-        test -n "$COLUMNS"; and set w $COLUMNS
-        set -l fill (math $w - (string length -- "$msg") - 4)
-        test $fill -ge 0; or set fill 0
-        echo (set_color $color)'── '(set_color normal)(set_color --bold)$msg(set_color normal)' '(set_color $color)(string repeat --max $fill '─')(set_color normal)
-    end
 
     function _up_rule -a color
-        set -l w 80
-        test -n "$COLUMNS"; and set w $COLUMNS
-        echo (set_color $color)(string repeat --max $w '─')(set_color normal)
+        echo (set_color $color)(string repeat --max 20 '─')(set_color normal)
+    end
+
+    function _up_header -a color msg
+        echo (set_color $color)'── '(set_color --bold)$msg(set_color normal)
     end
 
     function _up_next -a color name
         set -q _up_started; and echo
         set -g _up_started 1
-        _up_header $color "$name"
+        _up_header $color $name
     end
 
-    function _up_footer -a color
-        _up_rule $color
+    function _up_mark -a color sym msg
+        echo (set_color $color)"  $sym"(set_color normal)" $msg"
     end
 
     function _up_ok -a msg
-        echo (set_color green)'  ✓'(set_color normal)" $msg"
+        _up_mark green ✓ $msg
     end
 
     function _up_warn -a msg
-        echo (set_color yellow)'  !'(set_color normal)" $msg"
+        _up_mark yellow ! $msg
     end
 
     function _up_fail -a msg
-        echo (set_color red)'  ✗'(set_color normal)" $msg" >&2
+        _up_mark red ✗ $msg >&2
     end
 
     function _up_item -a msg
@@ -53,102 +48,142 @@ function up --description 'Update the system and check maintenance tasks (topgra
     # Detect AUR helper (paru > yay > pikaur > pacman)
     set -l helper
     for h in paru yay pikaur
-        if command -q $h
-            set helper $h
-            break
-        end
+        command -q $h; and set helper $h; and break
     end
 
-    _up_next cyan 'Packages'
+    _up_next cyan Packages
     if test -n "$helper"
         if $helper -Syu --noconfirm
-            _up_ok "Packages updated successfully ($helper)"
-            _up_track 'Packages' OK
+            _up_ok "Packages updated ($helper)"
+            _up_track Packages OK
         else
             _up_fail 'Package update failed'
-            _up_track 'Packages' FAILED
+            _up_track Packages FAILED
         end
     else if command -q pacman
         _up_warn 'No AUR helper found, updating with pacman'
         if sudo pacman -Syu --noconfirm
-            _up_ok 'Packages updated successfully'
-            _up_track 'Packages' OK
+            _up_ok 'Packages updated'
+            _up_track Packages OK
         else
             _up_fail 'Package update failed'
-            _up_track 'Packages' FAILED
+            _up_track Packages FAILED
         end
     else
         _up_fail 'No supported package manager found'
-        _up_track 'Packages' FAILED
+        _up_track Packages FAILED
     end
-    _up_footer cyan
+    _up_rule cyan
 
     if command -q flatpak
-        _up_next blue 'Flatpak'
+        _up_next blue Flatpak
         if flatpak update -y
-            _up_ok 'Flatpaks updated successfully'
-            _up_track 'Flatpak' OK
+            _up_ok 'Flatpaks updated'
+            _up_track Flatpak OK
         else
             _up_fail 'Flatpak update failed'
-            _up_track 'Flatpak' FAILED
+            _up_track Flatpak FAILED
         end
-        _up_footer blue
+        _up_rule blue
     else
-        _up_track 'Flatpak' SKIPPED
+        _up_track Flatpak SKIPPED
+    end
+
+    if command -q gext
+        _up_next brblue 'GNOME extensions'
+        if gext upgrade --all
+            _up_ok 'Extensions upgraded'
+            _up_track GNOME OK
+        else
+            _up_fail 'Extension upgrade failed'
+            _up_track GNOME FAILED
+        end
+        _up_rule brblue
+    else
+        _up_track GNOME SKIPPED
+    end
+
+    if command -q protonplus
+        _up_next brcyan Proton
+        if protonplus update all
+            _up_ok 'Proton builds updated'
+            _up_track Proton OK
+        else
+            _up_fail 'Proton update failed'
+            _up_track Proton FAILED
+        end
+        _up_rule brcyan
+    else
+        _up_track Proton SKIPPED
+    end
+
+    if command -q tealdeer; or command -q tldr
+        _up_next brgreen tldr
+        set -l updated 0
+        if command -q tealdeer
+            tealdeer update; and set updated 1
+        else
+            tldr --update; and set updated 1
+        end
+        if test $updated -eq 1
+            _up_ok 'Pages updated'
+            _up_track tldr OK
+        else
+            _up_fail 'tldr update failed'
+            _up_track tldr FAILED
+        end
+        _up_rule brgreen
+    else
+        _up_track tldr SKIPPED
     end
 
     _up_next magenta 'Configuration files'
-    set -l pacnew_files (find /etc -type f \( \
-        -name "*.pacnew" -o \
-        -name "*.pacsave" \
-    \) 2>/dev/null)
+    set -l pacnew (find /etc -type f \
+        \( -name '*.pacnew' -o -name '*.pacsave' \) 2>/dev/null)
 
-    if test (count $pacnew_files) -gt 0
-        _up_warn (count $pacnew_files)" file(s) need attention (run 'sudo pacdiff')"
-        for file in $pacnew_files
-            _up_item $file
-        end
-        _up_track 'Configuration' WARNED
+    if test (count $pacnew) -gt 0
+        _up_warn (count $pacnew)" file(s) need attention (sudo pacdiff)"
+        _up_item $pacnew
+        _up_track Configuration WARNED
     else
         _up_ok 'No .pacnew or .pacsave files found'
-        _up_track 'Configuration' OK
+        _up_track Configuration OK
     end
-    _up_footer magenta
+    _up_rule magenta
 
     if command -q systemctl
         _up_next yellow 'Systemd services'
         if systemctl --failed --plain --no-legend | string length -q
             _up_fail 'Failed services detected:'
             systemctl --failed
-            _up_track 'Services' FAILED
+            _up_track Services FAILED
         else
             _up_ok 'All services are running normally'
-            _up_track 'Services' OK
+            _up_track Services OK
         end
-        _up_footer yellow
+        _up_rule yellow
     else
-        _up_track 'Services' SKIPPED
+        _up_track Services SKIPPED
     end
 
     # Summary
-    _up_next green 'Summary'
+    _up_next green Summary
     for i in (seq (count $_up_names))
         switch $_up_status[$i]
             case OK
-                echo (set_color green)'  ✓'(set_color normal)' '$_up_names[$i]
+                _up_mark green ✓ $_up_names[$i]
             case FAILED
-                echo (set_color red)'  ✗'(set_color normal)' '$_up_names[$i]
+                _up_mark red ✗ $_up_names[$i]
             case WARNED
-                echo (set_color yellow)'  !'(set_color normal)' '$_up_names[$i]
+                _up_mark yellow ! $_up_names[$i]
             case SKIPPED
-                echo (set_color brblack)'  ·'(set_color normal)' '$_up_names[$i]
+                _up_mark brblack · $_up_names[$i]
         end
     end
     _up_item (math (date +%s) - $start)'s'
-    _up_footer green
+    _up_rule green
 
-    functions -e _up_header _up_next _up_ok _up_warn _up_fail _up_item _up_track _up_rule _up_footer
-    set -e _up_names
-    set -e _up_status
-    set -e _up_started
+    functions -e _up_rule _up_header _up_next _up_mark \
+        _up_ok _up_warn _up_fail _up_item _up_track
+    set -e _up_names _up_status _up_started
 end
