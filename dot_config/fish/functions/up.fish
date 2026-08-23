@@ -89,26 +89,6 @@ function up --description 'Update system and check maintenance (topgrade-style)'
         _up_track Flatpak SKIPPED
     end
 
-    if command -q tealdeer; or command -q tldr
-        _up_next brgreen tldr
-        set -l updated 0
-        if command -q tealdeer
-            tealdeer update; and set updated 1
-        else
-            tldr --update; and set updated 1
-        end
-        if test $updated -eq 1
-            _up_ok 'Pages updated'
-            _up_track tldr OK
-        else
-            _up_fail 'tldr update failed'
-            _up_track tldr FAILED
-        end
-        _up_rule brgreen
-    else
-        _up_track tldr SKIPPED
-    end
-
     _up_next magenta 'Configuration files'
     set -l pacnew (find /etc -type f \
         \( -name '*.pacnew' -o -name '*.pacsave' \) 2>/dev/null)
