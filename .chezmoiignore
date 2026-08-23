@@ -8,3 +8,6 @@ README.md
 **/groq.fish
 **/cerebras.fish
 **/qwen.fish
+.config/opencode/node_modules
+.config/mpv/cache
+.config/mpv/script-opts/memo-history.log
