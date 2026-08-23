@@ -89,34 +89,6 @@ function up --description 'Update system and check maintenance (topgrade-style)'
         _up_track Flatpak SKIPPED
     end
 
-    if command -q gext
-        _up_next brblue 'GNOME extensions'
-        if gext upgrade --all
-            _up_ok 'Extensions upgraded'
-            _up_track GNOME OK
-        else
-            _up_fail 'Extension upgrade failed'
-            _up_track GNOME FAILED
-        end
-        _up_rule brblue
-    else
-        _up_track GNOME SKIPPED
-    end
-
-    if command -q protonplus
-        _up_next brcyan Proton
-        if protonplus update all
-            _up_ok 'Proton builds updated'
-            _up_track Proton OK
-        else
-            _up_fail 'Proton update failed'
-            _up_track Proton FAILED
-        end
-        _up_rule brcyan
-    else
-        _up_track Proton SKIPPED
-    end
-
     if command -q tealdeer; or command -q tldr
         _up_next brgreen tldr
         set -l updated 0
