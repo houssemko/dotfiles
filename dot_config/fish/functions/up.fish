@@ -1,6 +1,5 @@
 function up --description 'Update the system and check maintenance tasks (topgrade-style)'
     set -l start (date +%s)
-    set -g _up_n 0
     set -g _up_names
     set -g _up_status
 
@@ -14,9 +13,20 @@ function up --description 'Update the system and check maintenance tasks (topgra
         echo (set_color $color)'── '(set_color normal)(set_color --bold)$msg(set_color normal)' '(set_color $color)(string repeat --max $fill '─')(set_color normal)
     end
 
-    function _up_next -a name
-        set -g _up_n (math $_up_n + 1)
-        _up_header brblack "$_up_n: $name"
+    function _up_rule -a color
+        set -l w 80
+        test -n "$COLUMNS"; and set w $COLUMNS
+        echo (set_color $color)(string repeat --max $w '─')(set_color normal)
+    end
+
+    function _up_next -a color name
+        set -q _up_started; and echo
+        set -g _up_started 1
+        _up_header $color "$name"
+    end
+
+    function _up_footer -a color
+        _up_rule $color
     end
 
     function _up_ok -a msg
@@ -49,7 +59,7 @@ function up --description 'Update the system and check maintenance tasks (topgra
         end
     end
 
-    _up_next 'Packages'
+    _up_next cyan 'Packages'
     if test -n "$helper"
         if $helper -Syu --noconfirm
             _up_ok "Packages updated successfully ($helper)"
@@ -71,9 +81,10 @@ function up --description 'Update the system and check maintenance tasks (topgra
         _up_fail 'No supported package manager found'
         _up_track 'Packages' FAILED
     end
+    _up_footer cyan
 
     if command -q flatpak
-        _up_next 'Flatpak'
+        _up_next blue 'Flatpak'
         if flatpak update -y
             _up_ok 'Flatpaks updated successfully'
             _up_track 'Flatpak' OK
@@ -81,11 +92,12 @@ function up --description 'Update the system and check maintenance tasks (topgra
             _up_fail 'Flatpak update failed'
             _up_track 'Flatpak' FAILED
         end
+        _up_footer blue
     else
         _up_track 'Flatpak' SKIPPED
     end
 
-    _up_next 'Configuration files'
+    _up_next magenta 'Configuration files'
     set -l pacnew_files (find /etc -type f \( \
         -name "*.pacnew" -o \
         -name "*.pacsave" \
@@ -101,9 +113,10 @@ function up --description 'Update the system and check maintenance tasks (topgra
         _up_ok 'No .pacnew or .pacsave files found'
         _up_track 'Configuration' OK
     end
+    _up_footer magenta
 
     if command -q systemctl
-        _up_next 'Systemd services'
+        _up_next yellow 'Systemd services'
         if systemctl --failed --plain --no-legend | string length -q
             _up_fail 'Failed services detected:'
             systemctl --failed
@@ -112,13 +125,13 @@ function up --description 'Update the system and check maintenance tasks (topgra
             _up_ok 'All services are running normally'
             _up_track 'Services' OK
         end
+        _up_footer yellow
     else
         _up_track 'Services' SKIPPED
     end
 
     # Summary
-    echo
-    _up_header brblack 'Summary'
+    _up_next green 'Summary'
     for i in (seq (count $_up_names))
         switch $_up_status[$i]
             case OK
@@ -132,9 +145,10 @@ function up --description 'Update the system and check maintenance tasks (topgra
         end
     end
     _up_item (math (date +%s) - $start)'s'
+    _up_footer green
 
-    functions -e _up_header _up_next _up_ok _up_warn _up_fail _up_item _up_track
-    set -e _up_n
+    functions -e _up_header _up_next _up_ok _up_warn _up_fail _up_item _up_track _up_rule _up_footer
     set -e _up_names
     set -e _up_status
+    set -e _up_started
 end
