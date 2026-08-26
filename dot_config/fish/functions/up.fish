@@ -6,18 +6,20 @@ function up --description 'Update system and check maintenance (topgrade-style)'
     # Message helpers, styled after topgrade
     # https://github.com/topgrade-rs/topgrade
 
-    function _up_rule -a color
-        echo (set_color $color)(string repeat --max 20 '─')(set_color normal)
-    end
-
-    function _up_header -a color msg
-        echo (set_color $color)'── '(set_color --bold)$msg(set_color normal)
+    function _up_rule -a color msg
+        if test (count $msg) -gt 0
+            set -l len (string length -- "$msg")
+            set -l pad (math "30 - $len")
+            test $pad -lt 1; and set pad 1
+            echo (set_color $color)"── "$msg" "(string repeat --max $pad '─')(set_color normal)
+        else
+            echo (set_color $color)(string repeat --max 30 '─')(set_color normal)
+        end
     end
 
     function _up_next -a color name
-        set -q _up_started; and echo
         set -g _up_started 1
-        _up_header $color $name
+        _up_rule $color $name
     end
 
     function _up_mark -a color sym msg
@@ -73,7 +75,6 @@ function up --description 'Update system and check maintenance (topgrade-style)'
         _up_fail 'No supported package manager found'
         _up_track Packages FAILED
     end
-    _up_rule cyan
 
     if command -q flatpak
         _up_next blue Flatpak
@@ -84,7 +85,6 @@ function up --description 'Update system and check maintenance (topgrade-style)'
             _up_fail 'Flatpak update failed'
             _up_track Flatpak FAILED
         end
-        _up_rule blue
     else
         _up_track Flatpak SKIPPED
     end
@@ -101,7 +101,6 @@ function up --description 'Update system and check maintenance (topgrade-style)'
         _up_ok 'No .pacnew or .pacsave files found'
         _up_track Configuration OK
     end
-    _up_rule magenta
 
     if command -q systemctl
         _up_next yellow 'Systemd services'
@@ -113,13 +112,13 @@ function up --description 'Update system and check maintenance (topgrade-style)'
             _up_ok 'All services are running normally'
             _up_track Services OK
         end
-        _up_rule yellow
     else
         _up_track Services SKIPPED
     end
 
     # Summary
-    _up_next green Summary
+    set -l elapsed (math (date +%s) - $start)'s'
+    _up_next green "Summary ($elapsed)"
     for i in (seq (count $_up_names))
         switch $_up_status[$i]
             case OK
@@ -132,10 +131,8 @@ function up --description 'Update system and check maintenance (topgrade-style)'
                 _up_mark brblack · $_up_names[$i]
         end
     end
-    _up_item (math (date +%s) - $start)'s'
-    _up_rule green
 
-    functions -e _up_rule _up_header _up_next _up_mark \
+    functions -e _up_rule _up_next _up_mark \
         _up_ok _up_warn _up_fail _up_item _up_track
     set -e _up_names _up_status _up_started
 end
