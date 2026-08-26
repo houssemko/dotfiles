@@ -1,8 +1,12 @@
-function cleanup --description 'Remove orphan packages'
-    set -l orphans (pacman -Qtdq)
-    if test -n "$orphans"
-        sudo pacman -Rns $orphans
+function cleanup --description 'Remove local orphaned packages'
+    if pacman -Qdtq >/dev/null 2>&1
+        while pacman -Qdtq >/dev/null 2>&1
+            sudo pacman -Rns (pacman -Qdtq)
+            if test $status -ne 0
+                break
+            end
+        end
     else
-        echo "Nothing to clean."
+        echo "No orphan packages found."
     end
 end
