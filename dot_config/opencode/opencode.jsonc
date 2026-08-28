@@ -36,14 +36,5 @@
         "qwen3.7-flash": { "name": "Qwen3.7 Flash", "tool_call": true }
       }
     }
-  },
-
-  "mcp": {
-    "github": {
-      "type": "remote",
-      "url": "https://api.githubcopilot.com/mcp/",
-      "enabled": true,
-      "headers": { "Authorization": "Bearer {env:GITHUB_TOKEN}" }
-    }
   }
 }
