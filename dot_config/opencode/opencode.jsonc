@@ -4,6 +4,7 @@
   "enabled_providers": ["opencode", "ollama-cloud", "google", "qwen", "zai", "fireworks", "hermes-free"],
 
   "plugin": [
+    "@dietrichgebert/ponytail",
     [
       "@razroo/opencode-model-fallback",
       {
