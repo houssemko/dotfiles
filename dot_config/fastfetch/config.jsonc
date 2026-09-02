@@ -4,10 +4,10 @@
         "constants": [" "] 
     },
     "logo": {
-        "type":"kitty",
-        "source": "${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch/pngs/CachyOS_Logo_catppuccin_1.png",
-        "width": 22,
-        "height": 10,
+        "type":"file",
+        "source": "${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch/logo.txt",
+        "width": 5,
+        "height": 1,
         "padding": {
             "right": 2,
             "left": 2,
