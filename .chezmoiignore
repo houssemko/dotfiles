@@ -5,10 +5,9 @@ README.md
 **/cache/**
 **/*.bak
 **/node_modules/**
-**/groq.fish
-**/cerebras.fish
-**/qwen.fish
-**/secrets.fish
+**/secrets.*
+**/.env
+**/.env.*
 .config/opencode/node_modules
 .config/mpv/cache
 .config/mpv/script-opts/memo-history.log
