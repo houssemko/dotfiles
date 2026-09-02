@@ -8,3 +8,6 @@ README.md
 **/secrets.*
 **/.env
 **/.env.*
+**/private_fish_variables
+**/package.json
+**/package-lock.json
