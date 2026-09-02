@@ -8,6 +8,3 @@ README.md
 **/secrets.*
 **/.env
 **/.env.*
-.config/opencode/node_modules
-.config/mpv/cache
-.config/mpv/script-opts/memo-history.log
