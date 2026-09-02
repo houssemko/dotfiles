@@ -3,6 +3,25 @@
   "model": "opencode/deepseek-v4-flash-free",
   "enabled_providers": ["opencode", "ollama-cloud", "google", "qwen", "zai", "fireworks", "hermes-free"],
 
+  "mcp": {
+    "sentrux": {
+      "type": "local",
+      "command": ["sentrux", "--mcp"],
+      "enabled": true
+    },
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true,
+      "headers": { "Authorization": "Bearer {env:CONTEXT7_API_KEY}" }
+    },
+    "composio": {
+      "type": "local",
+      "command": ["bunx", "mcp-remote", "https://connect.composio.dev/mcp"],
+      "enabled": true
+    }
+  },
+
   "plugin": [
     "@dietrichgebert/ponytail",
     [

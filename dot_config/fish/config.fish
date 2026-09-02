@@ -23,4 +23,3 @@ abbr fu flatpak uninstall
 
 # Use fd as the default fzf command
 set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
-
