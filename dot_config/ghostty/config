@@ -9,8 +9,10 @@ gtk-titlebar-style = native
 palette-harmonious = true
 theme = Monokai Pro
 window-subtitle = working-directory
-background-blur= true
-background-opacity= 0.9
+
+background-opacity = 0.8
+background-blur = true
+
 window-padding-balance = true
 window-height = 32
 window-width = 120
