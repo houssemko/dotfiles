@@ -24,7 +24,9 @@ Build robust GTK 4/libadwaita applications with correct architecture, lifecycle,
 | Setting up new app boilerplate | THIS SKILL |
 | Packaging for Flatpak | THIS SKILL |
 
-## What's Current (libadwaita 1.7+, GTK 4.18+)
+## What's Current — resolve latest stable first, never hardcode versions
+
+Before writing code, check the newest stable GTK, libadwaita, and language-binding releases available (system packages, Flathub runtime, crates.io/PyPI) and target those. Snapshot below for orientation only:
 
 **API deprecations to avoid:**
 - `GtkShortcutsWindow` → Use `AdwShortcutsDialog` (libadwaita 1.8+)
