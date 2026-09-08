@@ -10,7 +10,7 @@
       }
     }
   },
-  "enabled_providers": ["opencode", "ollama-cloud", "google", "qwen", "zai", "hermes-free", "nvidia"],
+  "enabled_providers": ["opencode", "ollama-cloud", "google", "qwen", "zai", "hermes-free", "openrouter", "nvidia"],
   "tools": {
     "composio*": true,
     "tavily*": true,
@@ -94,6 +94,22 @@
         "qwen3.7-max": { "name": "Qwen3.7 Max", "reasoning": true, "tool_call": true },
         "qwen3.7-plus": { "name": "Qwen3.7 Plus", "tool_call": true },
         "qwen3.7-flash": { "name": "Qwen3.7 Flash", "tool_call": true }
+      }
+    },
+    "openrouter": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "OpenRouter",
+      "options": {
+        "baseURL": "https://openrouter.ai/api/v1",
+        "apiKey": "{env:OPENROUTER_API_KEY}"
+      },
+      "models": {
+        "openrouter/auto": { "name": "Auto (free router)", "tool_call": true, "reasoning": true },
+        "openai/gpt-oss-120b:free": { "name": "GPT-OSS 120B (free)", "tool_call": true, "reasoning": true },
+        "poolside/laguna-m.1:free": { "name": "Laguna M.1 (free)", "tool_call": true, "reasoning": true },
+        "thinkingmachines/inkling:free": { "name": "Inkling (free)", "tool_call": true, "reasoning": true },
+        "thinkingmachines/inkling-small:free": { "name": "Inkling Small (free)", "tool_call": true, "reasoning": true },
+        "minimax/minimax-m3:free": { "name": "MiniMax M3 (free)", "tool_call": true, "reasoning": true }
       }
     },
     "nvidia": {
