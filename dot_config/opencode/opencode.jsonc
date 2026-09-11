@@ -50,6 +50,7 @@
   },
 
   "plugin": [
+    "/home/houssem/.config/opencode/vendor/i-have-adhd/.opencode/plugins/i-have-adhd.mjs",
     "@dietrichgebert/ponytail",
     [
       "@razroo/opencode-model-fallback",
@@ -59,13 +60,16 @@
           "nvidia/moonshotai/kimi-k3",
           "nvidia/deepseek-ai/deepseek-v4-pro-0813",
           "qwen/qwen3-coder-plus",
-          "qwen/qwen3.7-flash"
-        ],
+          "qwen/qwen3.7-flash",
+    "opencode-supermemory@latest"
+  ],
         "cooldown_seconds": 300,
         "timeout_seconds": 45,
         "notify_on_fallback": true
       }
-    ]
+    ],
+    "@tarquinen/opencode-dcp@latest",
+    "opencode-goal-plugin@0.10.0"
   ],
 
   "permission": {
