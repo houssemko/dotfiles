@@ -61,8 +61,7 @@
           "nvidia/moonshotai/kimi-k3",
           "nvidia/deepseek-ai/deepseek-v4-pro-0813",
           "qwen/qwen3-coder-plus",
-          "qwen/qwen3.7-flash",
-    "opencode-supermemory@latest"
+          "qwen/qwen3.7-flash"
   ],
         "cooldown_seconds": 300,
         "timeout_seconds": 45,
