@@ -3,6 +3,7 @@
   "theme": "system",
   "plugin": [
     "@tarquinen/opencode-dcp@latest",
-    "oh-my-openagent@latest"
+    "oh-my-openagent@latest",
+    "oh-my-openagent@4.19.4"
   ]
 }

@@ -10,24 +10,26 @@
       "model": "opencode/muse-spark-1.3-contributor-free",
       "variant": "xhigh",
       "tools": {
-        "composio*": true
+        // Executor only: side-effect servers are deny-by-default globally
+        // (see top-level "tools"). RCE-equivalent code-exec tool stays denied.
+        "composio*": true,
+        "playwright*": true,
+        "playwright_browser_run_code_unsafe": false
       }
     }
   },
   "enabled_providers": [
     "opencode",
-    "ollama-cloud",
-    "google",
-    "qwen",
-    "zai",
     "hermes-free",
-    "openrouter",
-    "nvidia"
+    "openrouter"
   ],
   "tools": {
-    "composio*": true,
+    // P1 hardening: side-effect servers deny-by-default; build agent re-enables.
+    // tavily*/context7* are read-only retrieval, stay on. To grant another
+    // agent access for a task, add the glob under that agent's "tools".
+    "composio*": false,
     "tavily*": true,
-    "playwright*": true,
+    "playwright*": false,
     "context7*": true
   },
   "mcp": {
@@ -48,9 +50,11 @@
       }
     },
     "composio": {
+      // Disabled 2026-09-15: no COMPOSIO_API_KEY in env, handshake fails/retries
+      // at boot. Re-enable when a key exists (also restores build-agent tools).
       "type": "remote",
       "url": "https://connect.composio.dev/mcp",
-      "enabled": true
+      "enabled": false
     },
     "tavily": {
       "type": "remote",
@@ -61,13 +65,15 @@
       }
     },
     "playwright": {
+      // Disabled 2026-09-15: bunx spawn is a boot stall suspect; enable only
+      // for browser/E2E sessions (also restores build-agent tools).
       "type": "local",
       "command": [
         "bunx",
-        "@playwright/mcp@latest",
+        "@playwright/mcp@0.0.81",
         "--headless"
       ],
-      "enabled": true
+      "enabled": false
     },
     "codegraph": {
       "type": "local",
@@ -82,10 +88,10 @@
   "plugin": [
     "/home/houssem/.config/opencode/plugins/ecc-hooks.ts",
     "/home/houssem/.config/opencode/vendor/i-have-adhd/.opencode/plugins/i-have-adhd.mjs",
-    "@dietrichgebert/ponytail",
-    "oh-my-openagent@latest",
+    "@dietrichgebert/ponytail@4.10.0",
+    "oh-my-openagent@4.19.4",
     [
-      "@razroo/opencode-model-fallback",
+      "@razroo/opencode-model-fallback@0.3.2",
       {
         "fallback_models": [
           "opencode/muse-spark-1.3-contributor-free",
@@ -99,7 +105,7 @@
         "notify_on_fallback": true
       }
     ],
-    "@tarquinen/opencode-dcp@latest",
+    "@tarquinen/opencode-dcp@3.1.15",
     "opencode-goal-plugin@0.10.0"
   ],
   "permission": {

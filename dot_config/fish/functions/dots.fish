@@ -18,6 +18,6 @@ function dots --description "Capture dotfile changes with chezmoi and push."
         echo "No changes to commit"
     else
         chezmoi git -- commit -m "update configs"
-        and env -u GITHUB_TOKEN -u GH_TOKEN chezmoi git -- push
+        and chezmoi git -- push
     end
 end
