@@ -11,3 +11,4 @@ README.md
 **/private_fish_variables
 **/package.json
 **/package-lock.json
+**/completions/chezmoi.fish
