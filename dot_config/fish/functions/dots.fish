@@ -5,7 +5,7 @@ function dots --description "Capture dotfile changes with chezmoi and push."
 
     set -l dirs (chezmoi managed -i dirs | string match -r '^[^/]+/[^/]+$' | sort -u)
     if set -q dirs[1]
-        chezmoi add ~/$dirs
+        chezmoi add --new ~/$dirs
     end
 
     chezmoi re-add
