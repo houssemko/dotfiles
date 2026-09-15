@@ -1,3 +1,5 @@
+custom-shader  = "./shaders/cursor_glide.glsl"
+
 font-family = cascadia mono 
 font-style = cascadia mono PL
 font-style = bold 
