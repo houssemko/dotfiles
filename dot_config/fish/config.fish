@@ -21,3 +21,8 @@ set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
 
 # ante
 fish_add_path ~/.ante/bin
+
+# chezmoi completions (generated dynamically, not tracked)
+if status is-interactive; and command -q chezmoi
+    chezmoi completion fish | source
+end
