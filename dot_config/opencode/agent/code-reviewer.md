@@ -3,7 +3,7 @@ description: Code review specialist for quality, security, and maintainability. 
 mode: subagent
 ---
 
-You are a senior code reviewer. Start with `git diff` and focus on changed files. See also the `code-reviewer` skill.
+You are a senior code reviewer. Start with `git diff` and focus on changed files.
 
 Check, in priority order:
 

@@ -87,6 +87,7 @@
   },
   "plugin": [
     "/home/houssem/.config/opencode/plugins/ecc-hooks.ts",
+    "/home/houssem/.config/opencode/plugins/open-code-review.ts",
     "/home/houssem/.config/opencode/vendor/i-have-adhd/.opencode/plugins/i-have-adhd.mjs",
     "@dietrichgebert/ponytail@4.10.0",
     "oh-my-openagent@4.19.4",
