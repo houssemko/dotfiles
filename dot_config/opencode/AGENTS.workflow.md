@@ -4,7 +4,7 @@ Always-follow guidelines ported from everything-claude-code, trimmed to zero-dep
 
 ## Delegation
 
-Complex feature or refactor → **planner** first, implement only after approval. Architecture decision → **architect** (ADR for significant calls). Code written → **code-reviewer** immediately. Auth/input/endpoints/secrets → **security-reviewer** before commit. Build red → **build-error-resolver**. Critical flows → **e2e-runner**. Docs stale → **doc-updater**. Run independent reviews in parallel.
+Complex feature or refactor → **planner** first, implement only after approval. Architecture decision → **architect** (ADR for significant calls). Auth/input/endpoints/secrets → **security-reviewer** before commit. Build red → **build-error-resolver**. Critical flows → **e2e-runner**. Docs stale → **doc-updater**. Run independent reviews in parallel.
 
 ## Slash commands
 
