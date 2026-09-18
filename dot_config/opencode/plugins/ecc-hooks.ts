@@ -1,39 +1,60 @@
-import type { Plugin } from "@opencode-ai/plugin"
-import { existsSync, mkdirSync } from "node:fs"
+import type { Plugin } from "@opencode/plugin"
+import { mkdirSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-// everything-claude-code hooks, zero-dependency port (node builtins only).
+// everything-claude-code hooks, V2 port (opencode v2 API).
 // - Blocks dev servers outside tmux (log access).
 // - Blocks stray .md/.txt creation (docs stay in README/guides/codemaps).
 // - Nudges strategic compaction every ~50 edits/writes.
 // - Logs PR URL + review command after `gh pr create`.
-// Skipped (need deps/services): prettier auto-format, tsc-after-edit,
-// package-manager detection, MCP configs, Node script hooks.
 
 const MEM = join(homedir(), ".config", "opencode", "memory")
 const DOC_ALLOW = /(README|CLAUDE|AGENTS|CONTRIBUTING)\.md$|\/codemaps\/|DELETION_LOG\.md$|learned\/.*SKILL\.md$/
-let editCount = 0
 
-export default (async () => {
-  try {
-    mkdirSync(MEM, { recursive: true })
-    mkdirSync(join(MEM, "evals"), { recursive: true })
-  } catch {
-    // best effort; commands create dirs as needed
+function extractResultText(result: unknown): string {
+  if (result == null) return ""
+  if (typeof result === "string") return result
+  if (typeof result !== "object") return String(result)
+  const r = result as { content?: unknown; output?: unknown }
+  if (typeof r.content === "string") return r.content
+  if (Array.isArray(r.content)) {
+    return r.content
+      .map((c) => {
+        if (typeof c === "string") return c
+        if (c != null && typeof c === "object" && "text" in c) return String((c as { text: unknown }).text)
+        return ""
+      })
+      .join("\n")
   }
+  if (typeof r.output === "string") return r.output
+  if (r.output != null) {
+    try {
+      return JSON.stringify(r.output)
+    } catch {
+      return String(r.output)
+    }
+  }
+  return ""
+}
 
-  return {
-    "tool.execute.before": async (input, output) => {
-      const tool = String(input?.tool ?? "").toLowerCase()
-      const args = output?.args as Record<string, unknown> | undefined
+export default {
+  id: "ecc-hooks",
+  async setup(ctx) {
+    let editCount = 0
+    try {
+      mkdirSync(MEM, { recursive: true })
+      mkdirSync(join(MEM, "evals"), { recursive: true })
+    } catch {
+      // best effort; commands create dirs as needed
+    }
+
+    await ctx.tool.hook("execute.before", (event) => {
+      const tool = String(event.tool ?? "").toLowerCase()
+      const args = event.input as Record<string, unknown> | undefined
       if (!args || typeof args !== "object") return
-      const cmd = (args as Record<string, unknown>).command
-      const file = String(
-        (args as Record<string, unknown>).file_path ??
-          (args as Record<string, unknown>).filePath ??
-          "",
-      )
+      const cmd = args.command
+      const file = String(args.file_path ?? args.filePath ?? "")
 
       if ((tool === "bash" || tool === "shell") && typeof cmd === "string") {
         if (/(npm|pnpm|yarn|bun)(\s+run)?\s+dev\b/.test(cmd) && !process.env.TMUX) {
@@ -44,7 +65,7 @@ export default (async () => {
         return
       }
 
-      if ((tool === "write") && file && /\.(md|txt)$/.test(file) && !DOC_ALLOW.test(file)) {
+      if (tool === "write" && file && /\.(md|txt)$/.test(file) && !DOC_ALLOW.test(file)) {
         throw new Error(
           `[ecc] Blocked stray doc file: ${file}. Put docs in README.md, guides, codemaps/, or a learned skill instead.`,
         )
@@ -58,14 +79,15 @@ export default (async () => {
           )
         }
       }
-    },
+    })
 
-    "tool.execute.after": async (input) => {
-      const tool = String(input?.tool ?? "").toLowerCase()
+    await ctx.tool.hook("execute.after", (event) => {
+      const tool = String(event.tool ?? "").toLowerCase()
       if (tool !== "bash" && tool !== "shell") return
-      const out = String((input as Record<string, unknown>)?.output ?? "")
+      if (event.status !== "completed") return
+      const out = extractResultText(event.result)
       const m = out.match(/https:\/\/github\.com\/([^/\s]+\/[^/\s]+)\/pull\/(\d+)/)
       if (m) console.error(`[ecc] PR created: ${m[0]} — review with: gh pr review ${m[2]} --repo ${m[1]}`)
-    },
-  }
-}) satisfies Plugin
+    })
+  },
+} satisfies Plugin

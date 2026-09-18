@@ -28,10 +28,11 @@ copy-on-select = true
 # Cursor Configuration
 cursor-style = bar
 cursor-style-blink = true
+mouse-hide-while-typing = true
+shell-integration-features = no-cursor
 
 # Terminal features
 mouse-hide-while-typing = true
-
 # Disable annoying copied to clipboard
 app-notifications = no-clipboard-copy,no-config-reload
 
