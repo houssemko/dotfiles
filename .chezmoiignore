@@ -12,3 +12,7 @@ README.md
 **/package.json
 **/package-lock.json
 **/completions/chezmoi.fish
+
+# OpenCode runtime/session state; never sync to the dotfiles repository.
+.config/opencode/goals
+.config/opencode/goals/**

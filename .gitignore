@@ -11,3 +11,6 @@ secrets.*
 **/private_fish_variables
 dot_config/opencode/package.json
 dot_config/opencode/package-lock.json
+
+# OpenCode runtime/session state; never commit it.
+dot_config/opencode/private_goals/
