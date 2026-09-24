@@ -5,9 +5,13 @@ function dots-capture --description "Capture one explicitly reviewed public targ
     end
 
     set -l repo (git rev-parse --show-toplevel 2>/dev/null)
-    or begin
-        echo "dots-capture: not inside a Git repository" >&2
-        return 1
+    if not set -q repo[1]
+        if test -e "$HOME/.dotfiles/.git"
+            set repo "$HOME/.dotfiles"
+        else
+            echo "dots-capture: not inside a Git repository" >&2
+            return 1
+        end
     end
     set -l guard $repo/dot_local/bin/dots-upload-guard
     set -l policy $HOME/.config/dots-upload-guard/policy.json

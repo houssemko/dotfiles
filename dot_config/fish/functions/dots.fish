@@ -1,8 +1,12 @@
 function dots --description "Review and push already-captured public dotfile changes."
     set -l repo (git rev-parse --show-toplevel 2>/dev/null)
-    or begin
-        echo "dots: not inside a Git repository" >&2
-        return 1
+    if not set -q repo[1]
+        if test -e "$HOME/.dotfiles/.git"
+            set repo "$HOME/.dotfiles"
+        else
+            echo "dots: not inside a Git repository" >&2
+            return 1
+        end
     end
 
     set -l guard $repo/dot_local/bin/dots-upload-guard
