@@ -510,18 +510,22 @@ def scan_repository(repo: Path, policy: Policy) -> list[tuple[str, str]]:
     return violations
 
 
-def check_filesystem_path(path: Path, policy: Policy) -> list[tuple[str, str]]:
-    """Check an explicit source/target path before a future add operation."""
+def check_filesystem_path(path: Path, repo: Path, policy: Policy) -> list[tuple[str, str]]:
+    """Check an explicit source path before a future add operation."""
+    candidate = path.expanduser()
     try:
-        relative = normalize_path(str(path))
-    except GuardError as exc:
+        if candidate.is_absolute():
+            relative = normalize_path(str(candidate.resolve().relative_to(repo.resolve())))
+        else:
+            relative = normalize_path(str(candidate))
+    except (GuardError, ValueError) as exc:
         raise GuardError("path could not be normalized") from exc
     if any(path_matches(relative, pattern) for pattern in policy.denied_globs):
         return [("denied-path", relative)]
     if relative not in policy.approved_paths:
         return [("unapproved-path", relative)]
-    if path.is_file() and not path.is_symlink():
-        data = path.read_bytes()
+    if candidate.is_file() and not candidate.is_symlink():
+        data = candidate.read_bytes()
         if is_binary(data):
             digest = hashlib.sha256(data).hexdigest()
             if policy.approved_binary_sha256.get(relative) != digest:
@@ -594,6 +598,58 @@ def initialize_policy(repo: Path, policy_path: Path) -> None:
         raise GuardError("policy could not be written") from exc
 
 
+def allow_path(repo: Path, policy_path: Path, source_path: Path) -> None:
+    """Add one explicitly reviewed source path to the local trusted policy."""
+    policy = load_policy(policy_path, repo)
+    candidate = source_path.expanduser()
+    try:
+        relative = normalize_path(str(candidate.resolve().relative_to(repo.resolve())))
+    except (GuardError, ValueError) as exc:
+        raise GuardError("allow path must be inside the repository") from exc
+    if any(path_matches(relative, pattern) for pattern in policy.denied_globs):
+        raise GuardError(f"path is denied: {relative}")
+    if not candidate.is_file() or candidate.is_symlink():
+        raise GuardError("allow path must be a regular file")
+    data = candidate.read_bytes()
+    binary_hash = hashlib.sha256(data).hexdigest() if is_binary(data) else None
+    temporary_policy = Policy(
+        approved_paths=frozenset(set(policy.approved_paths) | {relative}),
+        denied_globs=policy.denied_globs,
+        approved_binary_sha256={
+            **policy.approved_binary_sha256,
+            **({relative: binary_hash} if binary_hash else {}),
+        },
+        allow_user_path_globs=policy.allow_user_path_globs,
+        max_text_bytes=policy.max_text_bytes,
+    )
+    violations = check_filesystem_path(candidate, repo, temporary_policy)
+    if violations:
+        print_violations(violations)
+        raise GuardError("path requires manual review")
+    resolved = policy_path.expanduser().resolve()
+    payload = {
+        "version": 1,
+        "approved_paths": sorted(temporary_policy.approved_paths),
+        "denied_globs": list(temporary_policy.denied_globs),
+        "approved_binary_sha256": dict(sorted(temporary_policy.approved_binary_sha256.items())),
+        "allow_user_path_globs": list(temporary_policy.allow_user_path_globs),
+        "max_text_bytes": temporary_policy.max_text_bytes,
+    }
+    temporary = resolved.with_name(resolved.name + ".tmp")
+    try:
+        with temporary.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        temporary.chmod(0o600)
+        temporary.replace(resolved)
+    except OSError as exc:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise GuardError("policy could not be written") from exc
+
+
 def print_violations(violations: list[tuple[str, str]]) -> None:
     limit = 100
     for rule, path in violations[:limit]:
@@ -617,10 +673,16 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--repository", action="store_true", help="scan every local ref and reachable object")
     mode.add_argument("--check-path", type=Path, help="scan one explicit filesystem path")
     mode.add_argument("--init-policy", action="store_true", help="create a local policy from the current index")
+    mode.add_argument("--allow-path", type=Path, help="add one reviewed source path to the local policy")
     parser.add_argument(
         "--accept-baseline",
         action="store_true",
         help="explicitly accept the scanned current index for --init-policy",
+    )
+    parser.add_argument(
+        "--accept-path",
+        action="store_true",
+        help="explicitly accept --allow-path after reviewing its content",
     )
     return parser
 
@@ -636,13 +698,19 @@ def main(argv: list[str] | None = None) -> int:
             initialize_policy(repo, Path(args.policy))
             print("public upload guard: local policy initialized")
             return 0
+        if args.allow_path:
+            if not args.accept_path:
+                raise GuardError("--allow-path requires --accept-path")
+            allow_path(repo, Path(args.policy), args.allow_path)
+            print("public upload guard: local path approved")
+            return 0
         policy = load_policy(Path(args.policy), repo)
         if args.staged:
             violations = scan_staged(repo, policy)
         elif args.repository:
             violations = scan_repository(repo, policy)
         else:
-            violations = check_filesystem_path(args.check_path, policy)
+            violations = check_filesystem_path(args.check_path, repo, policy)
     except GuardError as exc:
         print(f"guard-error: {exc}", file=sys.stderr)
         return 2

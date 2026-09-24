@@ -178,6 +178,24 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(self.policy.stat().st_mode & 0o777, 0o600)
         self.assertEqual(self.run_guard("--staged").returncode, 0)
 
+    def test_allow_path_requires_explicit_acceptance(self):
+        self.write_policy(["public.txt"])
+        candidate = self.repo / "new.txt"
+        candidate.write_text("safe\\n", encoding="utf-8")
+        result = self.run_guard("--allow-path", str(candidate))
+        self.assertNotEqual(result.returncode, 0)
+        approved = json.loads(self.policy.read_text(encoding="utf-8"))["approved_paths"]
+        self.assertNotIn("new.txt", approved)
+
+    def test_allow_path_adds_reviewed_public_file(self):
+        self.write_policy(["public.txt"])
+        candidate = self.repo / "new.txt"
+        candidate.write_text("safe\\n", encoding="utf-8")
+        result = self.run_guard("--allow-path", str(candidate), "--accept-path")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.run_git("add", "new.txt")
+        self.assertEqual(self.run_guard("--staged").returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
