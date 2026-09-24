@@ -382,6 +382,27 @@ class GuardTests(unittest.TestCase):
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         ), marker
 
+    def test_target_outside_public_config_root_is_rejected(self):
+        self.write_policy([])
+        target = self.base / "outside.txt"
+        target.write_text("safe\n", encoding="utf-8")
+        result = self.run_guard(
+            "--check-target", str(target), "--target-root", str(self.base)
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("target-outside-public-root", result.stdout + result.stderr)
+
+    def test_common_credential_filename_is_rejected_before_capture(self):
+        self.write_policy([])
+        target = self.base / ".config" / ".netrc"
+        target.parent.mkdir(parents=True)
+        target.write_text("machine login user\n", encoding="utf-8")
+        result = self.run_guard(
+            "--check-target", str(target), "--target-root", str(self.base)
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("denied-target", result.stdout + result.stderr)
+
     def test_push_input_blob_is_scanned_even_without_a_ref(self):
         self.write_policy([])
         blob_file = self.base / "push-blob.txt"

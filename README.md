@@ -40,14 +40,16 @@ chezmoi init --apply https://github.com/houssemko/dotfiles.git
 `dots` is deliberately fail-closed for the public repository:
 
 - It never runs broad `chezmoi re-add`; use `dots-capture <file>` for an explicit,
-  reviewed public target.
+  reviewed public target under `~/.config`.
 - It refuses untracked files and stages only already-approved tracked paths.
 - It runs the local `dots-upload-guard` against the complete Git index and all
   local refs before commit/push.
 - It asks for confirmation before committing and pushing.
 - ChezMoi automatic commits and pushes are disabled.
 
-The trusted public allowlist lives outside the repository at
+The active guard is the installed copy at `~/.local/bin/dots-upload-guard`;
+the repository copy is source material, not the enforcement boundary. The
+trusted public allowlist lives outside the repository at
 `~/.config/dots-upload-guard/policy.json` and must be initialized explicitly:
 
 ```bash

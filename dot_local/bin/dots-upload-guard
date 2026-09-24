@@ -703,6 +703,8 @@ def check_target_path(path: Path, root: Path, policy: Policy) -> list[tuple[str,
     except ValueError:
         return [("target-outside-root", str(candidate))]
     relative = normalize_path(str(relative_path))
+    if not relative_path.parts or relative_path.parts[0] != ".config":
+        return [("target-outside-public-root", str(candidate))]
     if any(path_matches(relative, pattern) for pattern in policy.denied_globs):
         return [("denied-target", relative)]
     cursor = root_path
