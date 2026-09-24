@@ -42,9 +42,17 @@ function dots-capture --description "Capture one explicitly reviewed public targ
             echo "dots-capture: target is ignored or cannot be mapped" >&2
             return 1
         end
-        if string match -q -- "$repo/*" "$source_path[1]"
-            set source_path[1] "$repo/$source_path[1]"
+        set -l source_candidate $source_path[1]
+        if not string match -q -r '^/' "$source_candidate"
+            set source_candidate "$repo/$source_candidate"
         end
+        set -l source_absolute (realpath -- "$source_candidate" 2>/dev/null)
+        set -l source_relative (realpath --relative-to="$repo" -- "$source_absolute" 2>/dev/null)
+        if test -z "$source_absolute"; or test -z "$source_relative"; or string match -q -r '^\.\./' "$source_relative"
+            echo "dots-capture: source is outside the repository" >&2
+            return 1
+        end
+        set source_path[1] "$repo/$source_relative"
 
         if not python3 $guard --repo $repo --policy $policy --check-path "$source_path[1]"
             set -l answer
