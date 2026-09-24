@@ -5,8 +5,14 @@ root=$(git rev-parse --show-toplevel 2>/dev/null) || {
     printf '%s\n' 'guard-error: repository root unavailable' >&2
     exit 2
 }
-policy=${DOTS_UPLOAD_GUARD_POLICY:-$HOME/.config/dots-upload-guard/policy.json}
-exec python3 "$root/dot_local/bin/dots-upload-guard" \
+guard="$HOME/.local/bin/dots-upload-guard"
+policy="$HOME/.config/dots-upload-guard/policy.json"
+if [ ! -x "$guard" ]; then
+    printf '%s\n' 'guard-error: immutable upload guard is unavailable' >&2
+    exit 2
+fi
+exec python3 "$guard" \
     --repo "$root" \
     --policy "$policy" \
-    --repository
+    --repository \
+    --push-oids

@@ -35,3 +35,27 @@ dot_config/opencode/service.json
 dot_config/opencode/cli.json
 dot_config/opencode/opencode.jsonc
 dot_config/opencode/plugins/rtk.ts
+
+# Credential/key formats are never public source.
+dot_config/**/.netrc
+dot_config/**/.npmrc
+dot_config/**/.pypirc
+dot_config/**/credentials
+dot_config/**/credentials.*
+dot_config/**/id_rsa
+dot_config/**/id_dsa
+dot_config/**/id_ecdsa
+dot_config/**/id_ed25519
+dot_config/**/*.pem
+dot_config/**/*.key
+dot_config/**/*.p12
+dot_config/**/*.pfx
+dot_config/**/*.jks
+dot_config/**/*.keystore
+dot_config/**/*.kdbx
+dot_config/**/.ssh/**
+dot_config/**/.gnupg/**
+dot_config/**/.aws/**
+dot_config/**/.azure/**
+dot_config/**/.docker/**
+dot_config/**/.kube/**

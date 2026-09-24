@@ -9,14 +9,20 @@ function dots --description "Review and push already-captured public dotfile cha
         end
     end
 
-    set -l guard $repo/dot_local/bin/dots-upload-guard
+    set -l guard $HOME/.local/bin/dots-upload-guard
     set -l policy $HOME/.config/dots-upload-guard/policy.json
     if not test -x $guard
-        echo "dots: missing upload guard: $guard" >&2
+        echo "dots: missing immutable upload guard: $guard" >&2
         return 1
     end
     if not test -f $policy
         echo "dots: initialize $policy with --accept-baseline first" >&2
+        return 1
+    end
+    set -l chezmoi_config (chezmoi cat-config 2>/dev/null)
+    if not string match -q -r '(?i)autoCommit\s*=\s*false' -- "$chezmoi_config" \
+        or not string match -q -r '(?i)autoPush\s*=\s*false' -- "$chezmoi_config"
+        echo "dots: chezmoi autoCommit and autoPush must both be false" >&2
         return 1
     end
 

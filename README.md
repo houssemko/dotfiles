@@ -51,7 +51,7 @@ The trusted public allowlist lives outside the repository at
 `~/.config/dots-upload-guard/policy.json` and must be initialized explicitly:
 
 ```bash
-python3 ~/.local/bin/dots-upload-guard --init-policy --accept-baseline
+python3 ~/.local/bin/dots-upload-guard --repo ~/.dotfiles --init-policy --accept-baseline
 ```
 
 The guard is accident prevention, not an absolute boundary: a deliberate

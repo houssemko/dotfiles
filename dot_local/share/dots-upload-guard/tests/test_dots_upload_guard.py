@@ -2,6 +2,8 @@
 import hashlib
 import json
 import os
+import shlex
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -50,8 +52,12 @@ class GuardTests(unittest.TestCase):
             "allow_user_path_globs": [],
         }
         self.policy.write_text(json.dumps(policy), encoding="utf-8")
+        self.policy.chmod(0o600)
 
-    def run_guard(self, *args):
+    def run_guard(self, *args, env=None, input_text=None):
+        environment = os.environ.copy()
+        if env:
+            environment.update(env)
         return subprocess.run(
             [
                 "python3",
@@ -63,6 +69,8 @@ class GuardTests(unittest.TestCase):
                 *args,
             ],
             cwd=self.repo,
+            env=environment,
+            input=input_text,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -195,6 +203,219 @@ class GuardTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.run_git("add", "new.txt")
         self.assertEqual(self.run_guard("--staged").returncode, 0)
+
+    def test_multiline_private_key_is_rejected(self):
+        self.write_policy(["key.txt"])
+        key = (
+            "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+            + ("A" * 64)
+            + "\n-----END OPENSSH PRIVATE KEY-----\n"
+        )
+        (self.repo / "key.txt").write_text(key, encoding="utf-8")
+        self.run_git("add", "key.txt")
+        result = self.run_guard("--staged")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private-key", result.stdout + result.stderr)
+
+    def test_dollar_in_secret_assignment_is_not_a_placeholder(self):
+        self.write_policy(["config.json"])
+        (self.repo / "config.json").write_text(
+            json.dumps({"password": "real$ecret"}), encoding="utf-8"
+        )
+        self.run_git("add", "config.json")
+        result = self.run_guard("--staged")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("real$ecret", result.stdout + result.stderr)
+
+    def test_token_containing_test_is_not_suppressed(self):
+        self.write_policy(["config.txt"])
+        canary = "github_pat_test" + ("A" * 32)
+        (self.repo / "config.txt").write_text(canary, encoding="utf-8")
+        self.run_git("add", "config.txt")
+        result = self.run_guard("--staged")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn(canary, result.stdout + result.stderr)
+
+    def test_fish_assignment_is_rejected(self):
+        self.write_policy(["config.fish"])
+        (self.repo / "config.fish").write_text(
+            "set -gx API_KEY real-value\\n", encoding="utf-8"
+        )
+        self.run_git("add", "config.fish")
+        result = self.run_guard("--staged")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("fish-sensitive-assignment", result.stdout + result.stderr)
+
+    def test_backslash_is_not_a_path_separator(self):
+        self.write_policy(["public/name.txt"])
+        literal = self.repo / "public\\\\name.txt"
+        literal.write_text("safe\\n", encoding="utf-8")
+        self.run_git("add", "public\\\\name.txt")
+        result = self.run_guard("--staged")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unapproved-path", result.stdout + result.stderr)
+
+    def test_relative_symlink_cannot_escape_repository(self):
+        self.write_policy(["link"])
+        (self.repo / "link").symlink_to("../outside")
+        self.run_git("add", "link")
+        result = self.run_guard("--staged")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("escaping-symlink", result.stdout + result.stderr)
+
+    def test_malformed_denied_glob_fails_closed(self):
+        self.write_policy(["public.txt"], denied_globs=["/absolute/*"])
+        result = self.run_guard("--staged")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsafe denied glob", (result.stdout + result.stderr).lower())
+
+    def test_rev_list_failure_fails_closed(self):
+        self.write_policy([])
+        self.run_git("commit", "--allow-empty", "-m", "baseline")
+        fake_bin = self.base / "bin"
+        fake_bin.mkdir()
+        real_git = shlex.quote(shutil.which("git") or "/usr/bin/git")
+        (fake_bin / "git").write_text(
+            f'#!/bin/sh\nif [ "$1" = "rev-list" ]; then exit 42; fi\nexec {real_git} "$@"\n',
+            encoding="utf-8",
+        )
+        (fake_bin / "git").chmod(0o755)
+        result = self.run_guard(
+            "--repository", env={"PATH": f"{fake_bin}:{os.environ.get('PATH', '')}"}
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("guard-error", (result.stdout + result.stderr).lower())
+
+    def test_commit_message_secret_is_rejected(self):
+        self.write_policy([])
+        canary = "github_pat_" + ("B" * 36)
+        self.run_git("commit", "--allow-empty", "-m", canary)
+        result = self.run_guard("--repository")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn(canary, result.stdout + result.stderr)
+
+    def test_lightweight_tag_to_blob_is_rejected(self):
+        self.write_policy([])
+        self.run_git("commit", "--allow-empty", "-m", "baseline")
+        blob_file = self.repo / "blob.txt"
+        blob_file.write_text("safe\\n", encoding="utf-8")
+        blob = self.run_git("hash-object", "-w", "blob.txt").stdout.strip()
+        self.run_git("update-ref", "refs/tags/blob-tag", blob)
+        result = self.run_guard("--repository")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unpathed-blob", result.stdout + result.stderr)
+
+    def test_annotated_tag_to_blob_is_rejected(self):
+        self.write_policy([])
+        self.run_git("commit", "--allow-empty", "-m", "baseline")
+        blob_file = self.repo / "blob.txt"
+        blob_file.write_text("safe\n", encoding="utf-8")
+        blob = self.run_git("hash-object", "-w", "blob.txt").stdout.strip()
+        self.run_git("tag", "-a", "annotated-blob-tag", blob, "-m", "tag")
+        result = self.run_guard("--repository")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unpathed-blob", result.stdout + result.stderr)
+
+    def test_tree_tag_is_scanned(self):
+        self.write_policy([])
+        self.run_git("commit", "--allow-empty", "-m", "baseline")
+        blob_file = self.repo / "blob.txt"
+        blob_file.write_text("safe\\n", encoding="utf-8")
+        blob = self.run_git("hash-object", "-w", "blob.txt").stdout.strip()
+        tree_input = f"100644 blob {blob}\tprivate.txt\n".encode()
+        tree = subprocess.run(
+            ["git", "mktree"], cwd=self.repo, input=tree_input,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+        ).stdout.decode().strip()
+        self.run_git("update-ref", "refs/tags/tree-tag", tree)
+        result = self.run_guard("--repository")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private.txt", result.stdout + result.stderr)
+    def run_capture(self, fake_config, target):
+        home = self.base / "capture-home"
+        home.mkdir(exist_ok=True)
+        policy_dir = home / ".config" / "dots-upload-guard"
+        policy_dir.mkdir(parents=True, exist_ok=True)
+        (policy_dir / "policy.json").write_text(
+            json.dumps({
+                "version": 1,
+                "approved_paths": [],
+                "denied_globs": ["**/private_*"],
+                "approved_binary_sha256": {},
+                "allow_user_path_globs": [],
+            }),
+            encoding="utf-8",
+        )
+        (policy_dir / "policy.json").chmod(0o600)
+        guard_dir = home / ".local" / "bin"
+        guard_dir.mkdir(parents=True, exist_ok=True)
+        guard_target = guard_dir / "dots-upload-guard"
+        shutil.copy2(GUARD, guard_target)
+        guard_target.chmod(0o755)
+        fake_bin = home / "bin"
+        fake_bin.mkdir(exist_ok=True)
+        marker = home / "add-called"
+        fake_chezmoi = fake_bin / "chezmoi"
+        fake_chezmoi.write_text(
+            "#!/bin/sh\n"
+            "if [ \"$1\" = \"cat-config\" ]; then\n"
+            f"  printf '%b\\n' '{fake_config}'\n"
+            "  exit 0\n"
+            "fi\n"
+            "if [ \"$1\" = \"add\" ]; then touch \"$CAPTURE_MARKER\"; exit 0; fi\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        fake_chezmoi.chmod(0o755)
+        env = os.environ.copy()
+        env.update({
+            "HOME": str(home),
+            "PATH": f"{fake_bin}:{env.get('PATH', '')}",
+            "CAPTURE_MARKER": str(marker),
+        })
+        command = (
+            f"source {shlex.quote(str(REPO_ROOT / 'dot_config/fish/functions/dots-capture.fish'))}; "
+            f"dots-capture {shlex.quote(str(target))}"
+        )
+        return subprocess.run(
+            ["fish", "-c", command], cwd=self.repo, env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        ), marker
+
+    def test_push_input_blob_is_scanned_even_without_a_ref(self):
+        self.write_policy([])
+        blob_file = self.base / "push-blob.txt"
+        blob_file.write_text("safe\n", encoding="utf-8")
+        blob = self.run_git("hash-object", "-w", str(blob_file)).stdout.strip()
+        push_input = f"refs/heads/main {blob} refs/heads/main {'0' * 40}\n"
+        result = self.run_guard(
+            "--repository", "--push-oids", input_text=push_input
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unpathed-blob", result.stdout + result.stderr)
+
+    def test_capture_refuses_auto_push_configuration(self):
+        target = self.base / "capture-target.txt"
+        target.write_text("safe\n", encoding="utf-8")
+        result, marker = self.run_capture(
+            "sourceDir = \\\"~/.dotfiles\\\"\\n[git]\\nautoCommit = true\\nautoPush = true",
+            target,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(marker.exists())
+
+    def test_capture_rejects_symlink_target(self):
+        target_real = self.base / "capture-real.txt"
+        target_real.write_text("private\n", encoding="utf-8")
+        target = self.base / "capture-link.txt"
+        target.symlink_to(target_real)
+        result, marker = self.run_capture(
+            "sourceDir = \\\"~/.dotfiles\\\"\\n[git]\\nautoCommit = false\\nautoPush = false",
+            target,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", (result.stdout + result.stderr).lower())
+        self.assertFalse(marker.exists())
 
 
 if __name__ == "__main__":
