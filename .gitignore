@@ -15,3 +15,23 @@ dot_config/opencode/package-lock.json
 
 # OpenCode runtime/session state; never commit it.
 dot_config/opencode/private_goals/
+
+# Private/runtime state and nested VCS metadata are never public source.
+dot_config/**/private_*
+dot_config/**/dot_git/**
+dot_config/**/.git/**
+dot_config/**/cache/**
+dot_config/**/caches/**
+dot_config/**/logs/**
+dot_config/**/history/**
+dot_config/**/state/**
+dot_config/**/sessions/**
+dot_config/**/*.log
+dot_config/**/*.log.*
+dot_config/**/*.bak
+dot_config/**/*.swp
+dot_config/opencode/agent-skills-install.json
+dot_config/opencode/service.json
+dot_config/opencode/cli.json
+dot_config/opencode/opencode.jsonc
+dot_config/opencode/plugins/rtk.ts

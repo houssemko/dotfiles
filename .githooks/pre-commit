@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    printf '%s\n' 'guard-error: repository root unavailable' >&2
+    exit 2
+}
+policy=${DOTS_UPLOAD_GUARD_POLICY:-$HOME/.config/dots-upload-guard/policy.json}
+exec python3 "$root/dot_local/bin/dots-upload-guard" \
+    --repo "$root" \
+    --policy "$policy" \
+    --staged

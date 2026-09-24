@@ -20,7 +20,7 @@ abbr fu flatpak uninstall
 set -x FZF_DEFAULT_COMMAND 'fd --type f --hidden --follow --exclude .git'
 
 # ante
-fish_add_path ~/.ante/bin
+fish_add_path "$HOME/.ante/bin"
 
 # chezmoi completions (generated dynamically, not tracked)
 if status is-interactive; and command -q chezmoi

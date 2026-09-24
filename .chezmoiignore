@@ -16,3 +16,41 @@ README.md
 # OpenCode runtime/session state; never sync to the dotfiles repository.
 .config/opencode/goals
 .config/opencode/goals/**
+
+# Private source attributes are permissions, not publication safety.
+**/private_*
+**/.git/**
+**/dot_git/**
+**/cache/**
+**/caches/**
+**/logs/**
+**/history/**
+**/state/**
+**/sessions/**
+**/*.log.*
+**/*.bak
+**/*.swp
+
+# Machine-local OpenCode/service state.
+.config/fish/fish_variables
+.config/opencode/opencode.jsonc
+.config/opencode/service.json
+.config/opencode/cli.json
+.config/opencode/plugins/rtk.ts
+.config/opencode/agent-skills-install.json
+.config/opencode/opencode-model-fallback.log*
+.config/opencode/.ponytail-active
+.config/opencode/skills/rust-skills/.git
+.config/opencode/skills/rust-skills/.git/**
+.config/opencode/vendor/i-have-adhd/.git
+.config/opencode/vendor/i-have-adhd/.git/**
+.config/mpv/cache
+.config/mpv/cache/**
+
+# Repository tooling and tests stay in the source repository, not $HOME.
+.githooks
+.githooks/**
+.local/bin/tests
+.local/bin/tests/**
+.local/share/dots-upload-guard/tests
+.local/share/dots-upload-guard/tests/**

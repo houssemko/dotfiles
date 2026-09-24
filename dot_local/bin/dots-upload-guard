@@ -1,0 +1,660 @@
+#!/usr/bin/env python3
+"""Fail-closed guard for the public dotfiles Git repository.
+
+The guard deliberately uses a local policy outside the repository.  A commit
+cannot expand its own authorization boundary by changing a tracked policy.
+"""
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import hashlib
+import json
+import os
+import posixpath
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
+
+
+class GuardError(Exception):
+    """An operational failure; callers must fail closed."""
+
+
+@dataclass(frozen=True)
+class Policy:
+    approved_paths: frozenset[str]
+    denied_globs: tuple[str, ...]
+    approved_binary_sha256: dict[str, str]
+    allow_user_path_globs: tuple[str, ...]
+    max_text_bytes: int
+
+
+@dataclass(frozen=True)
+class TreeEntry:
+    mode: str
+    object_type: str
+    object_id: str
+    path: str
+
+
+DEFAULT_DENIED_GLOBS = (
+    "**/private_*",
+    "**/dot_git/**",
+    "**/.git/**",
+    "**/cache/**",
+    "**/caches/**",
+    "**/logs/**",
+    "**/history/**",
+    "**/state/**",
+    "**/sessions/**",
+    "**/*.log",
+    "**/*.log.*",
+    "**/*.bak",
+    "**/*.swp",
+    "**/service.json",
+    "**/cli.json",
+    "**/agent-skills-install.json",
+    "**/.ponytail-active",
+)
+
+# These are intentionally high-confidence.  Generic words such as "token"
+# are handled only in configuration-like files by scan_text below.
+SECRET_PATTERNS = (
+    (
+        "private-key",
+        re.compile(
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----\s+"
+            r"[A-Za-z0-9+/=]{40,}\s+-----END [A-Z ]*PRIVATE KEY-----"
+        ),
+    ),
+    ("github-pat", re.compile(r"github_pat_[A-Za-z0-9_]{20,}")),
+    ("github-token", re.compile(r"gh[pousr]_[A-Za-z0-9_]{20,}")),
+    ("openai-token", re.compile(r"sk-[A-Za-z0-9_-]{20,}")),
+    ("google-api-key", re.compile(r"AIza[0-9A-Za-z_-]{20,}")),
+    ("aws-access-key", re.compile(r"AKIA[0-9A-Z]{16}")),
+    ("jwt", re.compile(r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")),
+    (
+        "bearer-token",
+        re.compile(r"(?i)authorization\s*[:=]\s*[\"']?bearer\s+[A-Za-z0-9._~+/=-]{8,}"),
+    ),
+)
+
+SENSITIVE_ASSIGNMENT = re.compile(
+    r"(?i)(?<![A-Za-z0-9-])[\"']?"
+    r"(api[_-]?key|apikey|access[_-]?token|auth[_-]?token|"
+    r"client[_-]?secret|password|passwd|secret|token)\b"
+    r"[\"']?\s*[:=]\s*[\"']?([^\"',;}\s]+)"
+)
+HOME_PATH = re.compile(r"(?<![A-Za-z0-9])(/(?:home|Users)/[^/\s\"'`]+)")
+SESSION_ID = re.compile(r"(?<![A-Za-z0-9])ses_[A-Za-z0-9]{20,}")
+
+CONFIG_SUFFIXES = {
+    ".conf",
+    ".cfg",
+    ".env",
+    ".ini",
+    ".json",
+    ".kdl",
+    ".jsonc",
+    ".toml",
+    ".xml",
+    ".yaml",
+    ".yml",
+}
+BINARY_MAGIC = (
+    b"\x89PNG\r\n\x1a\n",
+    b"\xff\xd8\xff",
+    b"GIF87a",
+    b"GIF89a",
+    b"PK\x03\x04",
+    b"\x1f\x8b",
+    b"7z\xbc\xaf\x27\x1c",
+    b"%PDF-",
+    b"\x7fELF",
+    b"\xca\xfe\xba\xbe",
+    b"\x00asm",
+    b"ustar",
+)
+PLACEHOLDER_MARKERS = (
+    "example",
+    "test",
+    "dummy",
+    "sample",
+    "changeme",
+    "change-me",
+    "your_",
+    "your-",
+    "redacted",
+    "replace",
+    "placeholder",
+    "valid_token",
+    "invalid_token",
+    "none",
+    "null",
+    "env:",
+    "{{",
+    "${",
+    "$",
+    "<",
+)
+
+
+def git(repo: Path, *args: str) -> bytes:
+    """Run Git without exposing child diagnostics or repository contents."""
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    except OSError as exc:
+        raise GuardError("git is unavailable") from exc
+    if result.returncode != 0:
+        raise GuardError(f"git {' '.join(args[:2])} failed")
+    return result.stdout
+
+
+def git_text(repo: Path, *args: str) -> str:
+    return git(repo, *args).decode("utf-8", "strict").strip()
+
+
+def normalize_path(value: str) -> str:
+    value = value.replace("\\", "/")
+    while value.startswith("./"):
+        value = value[2:]
+    normalized = posixpath.normpath(value)
+    if normalized in ("", "."):
+        return ""
+    if normalized.startswith("/") or normalized == ".." or normalized.startswith("../"):
+        raise GuardError("policy contains an unsafe path")
+    return normalized
+
+
+def glob_to_regex(pattern: str) -> re.Pattern[str]:
+    """Translate a path glob while keeping path separators significant."""
+    pattern = normalize_path(pattern)
+    pieces = ["^"]
+    i = 0
+    while i < len(pattern):
+        char = pattern[i]
+        if pattern.startswith("**/", i):
+            pieces.append("(?:.*/)?")
+            i += 3
+            continue
+        if pattern.startswith("**", i):
+            pieces.append(".*")
+            i += 2
+            continue
+        if char == "*":
+            pieces.append("[^/]*")
+        elif char == "?":
+            pieces.append("[^/]")
+        else:
+            pieces.append(re.escape(char))
+        i += 1
+    pieces.append("$")
+    return re.compile("".join(pieces))
+
+
+def path_matches(path: str, pattern: str) -> bool:
+    try:
+        return bool(glob_to_regex(pattern).fullmatch(normalize_path(path)))
+    except GuardError:
+        return False
+
+
+def path_is_allowed_by_policy(path: str, policy: Policy) -> bool:
+    normalized = normalize_path(path)
+    if any(path_matches(normalized, pattern) for pattern in policy.denied_globs):
+        return False
+    return normalized in policy.approved_paths
+
+
+def path_is_user_exception(path: str, policy: Policy) -> bool:
+    normalized = normalize_path(path)
+    return any(path_matches(normalized, pattern) for pattern in policy.allow_user_path_globs)
+
+
+def load_policy(path: Path, repo: Path) -> Policy:
+    try:
+        resolved = path.expanduser().resolve()
+        repo_resolved = repo.resolve()
+        if resolved == repo_resolved or repo_resolved in resolved.parents:
+            raise GuardError("policy must be outside the repository")
+        with resolved.open("r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except GuardError:
+        raise
+    except (OSError, json.JSONDecodeError) as exc:
+        raise GuardError("policy could not be loaded") from exc
+
+    if not isinstance(raw, dict) or raw.get("version") != 1:
+        raise GuardError("policy has an unsupported schema")
+    approved = raw.get("approved_paths")
+    denied = raw.get("denied_globs")
+    binary = raw.get("approved_binary_sha256")
+    user_paths = raw.get("allow_user_path_globs", [])
+    max_text_bytes = raw.get("max_text_bytes", 8 * 1024 * 1024)
+    if not isinstance(approved, list) or not isinstance(denied, list):
+        raise GuardError("policy has invalid path lists")
+    if not isinstance(binary, dict) or not isinstance(user_paths, list):
+        raise GuardError("policy has invalid exceptions")
+    if not isinstance(max_text_bytes, int) or max_text_bytes < 1024:
+        raise GuardError("policy has an invalid text limit")
+
+    approved_paths: set[str] = set()
+    for item in approved:
+        if not isinstance(item, str):
+            raise GuardError("policy contains a non-string path")
+        normalized = normalize_path(item)
+        if not normalized:
+            raise GuardError("policy contains an empty path")
+        approved_paths.add(normalized)
+
+    denied_globs: list[str] = []
+    for item in [*denied, *DEFAULT_DENIED_GLOBS]:
+        if not isinstance(item, str):
+            raise GuardError("policy contains a non-string glob")
+        denied_globs.append(item)
+    for item in user_paths:
+        if not isinstance(item, str):
+            raise GuardError("policy contains a non-string exception")
+    binary_hashes: dict[str, str] = {}
+    for item, digest in binary.items():
+        if not isinstance(item, str) or not isinstance(digest, str):
+            raise GuardError("policy contains an invalid binary approval")
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise GuardError("policy contains an invalid binary digest")
+        binary_hashes[normalize_path(item)] = digest
+
+    return Policy(
+        approved_paths=frozenset(approved_paths),
+        denied_globs=tuple(denied_globs),
+        approved_binary_sha256=binary_hashes,
+        allow_user_path_globs=tuple(user_paths),
+        max_text_bytes=max_text_bytes,
+    )
+
+
+def looks_like_placeholder(value: str) -> bool:
+    lowered = value.strip().strip("\"'").lower()
+    if not lowered:
+        return True
+    if lowered in {"~", "/users/user", "/home/example", "/users/example"}:
+        return True
+    if lowered.startswith("env:") or lowered.startswith("{{") or lowered.startswith("${"):
+        return True
+    return any(marker in lowered for marker in PLACEHOLDER_MARKERS)
+
+
+def is_binary(data: bytes) -> bool:
+    if b"\x00" in data:
+        return True
+    if any(data.startswith(magic) for magic in BINARY_MAGIC):
+        return True
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return True
+    return False
+
+
+def scan_text(path: str, text: str, policy: Policy) -> list[tuple[str, int]]:
+    violations: list[tuple[str, int]] = []
+    config_like = Path(path).suffix.lower() in CONFIG_SUFFIXES
+    user_exception = path_is_user_exception(path, policy)
+    for line_number, line in enumerate(text.splitlines(), 1):
+        for name, pattern in SECRET_PATTERNS:
+            match = pattern.search(line)
+            if match:
+                value = match.group(0)
+                if not looks_like_placeholder(value):
+                    violations.append((name, line_number))
+        if config_like:
+            for match in SENSITIVE_ASSIGNMENT.finditer(line):
+                if not looks_like_placeholder(match.group(2)):
+                    violations.append(("sensitive-assignment", line_number))
+            if not user_exception:
+                home_match = HOME_PATH.search(line)
+                if home_match and not looks_like_placeholder(home_match.group(0)):
+                    violations.append(("user-home-path", line_number))
+                if SESSION_ID.search(line) and not looks_like_placeholder(SESSION_ID.search(line).group(0)):
+                    violations.append(("session-id", line_number))
+    return violations
+
+
+def read_blobs(repo: Path, object_ids: Iterable[str], cache: dict[str, bytes]) -> None:
+    """Read many blobs in one Git process, keeping child output suppressed."""
+    missing = sorted({object_id for object_id in object_ids if object_id not in cache})
+    if not missing:
+        return
+    payload = ("\n".join(missing) + "\n").encode("ascii")
+    try:
+        process = subprocess.Popen(
+            ["git", "cat-file", "--batch"],
+            cwd=repo,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        output, _ = process.communicate(payload, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise GuardError("Git blobs could not be read") from exc
+    if process.returncode != 0:
+        raise GuardError("Git blobs could not be read")
+
+    offset = 0
+    for object_id in missing:
+        newline = output.find(b"\n", offset)
+        if newline < 0:
+            raise GuardError("Git returned an invalid blob header")
+        header = output[offset:newline].split()
+        offset = newline + 1
+        if len(header) != 3 or header[1] == b"missing":
+            raise GuardError("Git returned an invalid blob header")
+        try:
+            size = int(header[2])
+        except ValueError as exc:
+            raise GuardError("Git returned an invalid blob size") from exc
+        end = offset + size
+        if end > len(output):
+            raise GuardError("Git returned a truncated blob")
+        cache[object_id] = output[offset:end]
+        offset = end
+        if output[offset : offset + 1] == b"\n":
+            offset += 1
+
+
+def read_blob(repo: Path, object_id: str, cache: dict[str, bytes]) -> bytes:
+    read_blobs(repo, [object_id], cache)
+    return cache[object_id]
+
+
+def parse_tree_entries(repo: Path, treeish: str) -> list[TreeEntry]:
+    raw = git(repo, "ls-tree", "-r", "-z", "--full-tree", treeish)
+    entries: list[TreeEntry] = []
+    for record in raw.split(b"\x00"):
+        if not record:
+            continue
+        try:
+            metadata, path_bytes = record.split(b"\t", 1)
+            mode, object_type, object_id = metadata.split(b" ", 2)
+            path = path_bytes.decode("utf-8", "strict")
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise GuardError("Git returned an invalid tree entry") from exc
+        entries.append(
+            TreeEntry(
+                mode=mode.decode("ascii", "strict"),
+                object_type=object_type.decode("ascii", "strict"),
+                object_id=object_id.decode("ascii", "strict"),
+                path=normalize_path(path),
+            )
+        )
+    return entries
+
+
+def check_entry(
+    entry: TreeEntry,
+    repo: Path,
+    policy: Policy,
+    blob_cache: dict[str, bytes],
+) -> list[tuple[str, str]]:
+    violations: list[tuple[str, str]] = []
+    path = entry.path
+    if any(path_matches(path, pattern) for pattern in policy.denied_globs):
+        violations.append(("denied-path", path))
+        return violations
+    if path not in policy.approved_paths:
+        violations.append(("unapproved-path", path))
+        return violations
+    if entry.mode == "160000":
+        violations.append(("gitlink", path))
+        return violations
+    if entry.mode == "120000":
+        target = read_blob(repo, entry.object_id, blob_cache).decode("utf-8", "replace")
+        if target.startswith("/") or target.startswith("~"):
+            violations.append(("absolute-symlink", path))
+        elif any(path_matches(posixpath.normpath(posixpath.join(posixpath.dirname(path), target)), pattern) for pattern in policy.denied_globs):
+            violations.append(("private-symlink", path))
+        return violations
+    if entry.object_type != "blob" or entry.mode not in {"100644", "100755", "100664"}:
+        violations.append(("unsupported-mode", path))
+        return violations
+
+    data = read_blob(repo, entry.object_id, blob_cache)
+    if is_binary(data):
+        digest = hashlib.sha256(data).hexdigest()
+        if policy.approved_binary_sha256.get(path) != digest:
+            violations.append(("unapproved-binary", path))
+        return violations
+    if len(data) > policy.max_text_bytes:
+        violations.append(("oversize-text", path))
+        return violations
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        violations.append(("unknown-encoding", path))
+        return violations
+    for rule, line_number in scan_text(path, text, policy):
+        violations.append((rule, f"{path}:{line_number}"))
+    return violations
+
+
+def scan_entries(
+    repo: Path,
+    entries: Iterable[TreeEntry],
+    policy: Policy,
+    blob_cache: dict[str, bytes],
+) -> list[tuple[str, str]]:
+    violations: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for entry in entries:
+        # The same blob can appear under multiple paths; path authorization is
+        # still checked for every path, while content parsing is cached.
+        for violation in check_entry(entry, repo, policy, blob_cache):
+            if violation not in seen:
+                seen.add(violation)
+                violations.append(violation)
+    return violations
+
+
+def scan_staged(repo: Path, policy: Policy) -> list[tuple[str, str]]:
+    try:
+        tree = git_text(repo, "write-tree")
+    except GuardError as exc:
+        raise GuardError("the Git index could not be resolved") from exc
+    entries = parse_tree_entries(repo, tree)
+    cache: dict[str, bytes] = {}
+    read_blobs(repo, (entry.object_id for entry in entries if entry.object_type == "blob"), cache)
+    return scan_entries(repo, entries, policy, cache)
+
+
+def scan_repository(repo: Path, policy: Policy) -> list[tuple[str, str]]:
+    blob_cache: dict[str, bytes] = {}
+    violations: list[tuple[str, str]] = []
+    all_entries: dict[tuple[str, str, str], TreeEntry] = {}
+    try:
+        commits = [line for line in git_text(repo, "rev-list", "--all").splitlines() if line]
+    except GuardError:
+        commits = []
+    for commit in commits:
+        for entry in parse_tree_entries(repo, commit):
+            all_entries[(entry.mode, entry.object_id, entry.path)] = entry
+    read_blobs(repo, (entry.object_id for entry in all_entries.values() if entry.object_type == "blob"), blob_cache)
+    violations.extend(scan_entries(repo, all_entries.values(), policy, blob_cache))
+
+    # Include tag and other ref objects, which are not always emitted by
+    # rev-list as commit objects.  Commit messages are scanned as metadata,
+    # but only secret patterns are relevant there.
+    refs = git(repo, "for-each-ref", "--format=%(objectname) %(objecttype)").decode(
+        "ascii", "strict"
+    )
+    for line in refs.splitlines():
+        parts = line.split()
+        if len(parts) != 2:
+            raise GuardError("Git returned an invalid ref")
+        object_id, object_type = parts
+        if object_type == "tag":
+            try:
+                raw = git(repo, "cat-file", "tag", object_id)
+            except GuardError as exc:
+                raise GuardError("a Git tag could not be read") from exc
+            for rule, line_number in scan_text("<git-tag>", raw.decode("utf-8", "replace"), policy):
+                violations.append((rule, f"tag:{line_number}"))
+    return violations
+
+
+def check_filesystem_path(path: Path, policy: Policy) -> list[tuple[str, str]]:
+    """Check an explicit source/target path before a future add operation."""
+    try:
+        relative = normalize_path(str(path))
+    except GuardError as exc:
+        raise GuardError("path could not be normalized") from exc
+    if any(path_matches(relative, pattern) for pattern in policy.denied_globs):
+        return [("denied-path", relative)]
+    if relative not in policy.approved_paths:
+        return [("unapproved-path", relative)]
+    if path.is_file() and not path.is_symlink():
+        data = path.read_bytes()
+        if is_binary(data):
+            digest = hashlib.sha256(data).hexdigest()
+            if policy.approved_binary_sha256.get(relative) != digest:
+                return [("unapproved-binary", relative)]
+        elif len(data) <= policy.max_text_bytes:
+            for rule, line_number in scan_text(relative, data.decode("utf-8"), policy):
+                return [(rule, f"{relative}:{line_number}")]
+        else:
+            return [("oversize-text", relative)]
+    return []
+
+
+def initialize_policy(repo: Path, policy_path: Path) -> None:
+    """Create a local policy only after scanning the complete current index."""
+    resolved = policy_path.expanduser().resolve()
+    repo_resolved = repo.resolve()
+    if resolved == repo_resolved or repo_resolved in resolved.parents:
+        raise GuardError("policy must be outside the repository")
+    if resolved.exists():
+        raise GuardError("policy already exists; refusing to overwrite it")
+    tree = git_text(repo, "write-tree")
+    entries = parse_tree_entries(repo, tree)
+    approved_paths: set[str] = set()
+    binary_hashes: dict[str, str] = {}
+    blob_cache: dict[str, bytes] = {}
+    read_blobs(repo, (entry.object_id for entry in entries if entry.object_type == "blob"), blob_cache)
+    for entry in entries:
+        if any(path_matches(entry.path, pattern) for pattern in DEFAULT_DENIED_GLOBS):
+            raise GuardError(f"baseline contains denied path: {entry.path}")
+        approved_paths.add(entry.path)
+        if entry.mode == "120000":
+            continue
+        if entry.mode == "160000":
+            raise GuardError(f"baseline contains gitlink: {entry.path}")
+        data = read_blob(repo, entry.object_id, blob_cache)
+        if is_binary(data):
+            binary_hashes[entry.path] = hashlib.sha256(data).hexdigest()
+    bootstrap = Policy(
+        approved_paths=frozenset(approved_paths),
+        denied_globs=DEFAULT_DENIED_GLOBS,
+        approved_binary_sha256=binary_hashes,
+        allow_user_path_globs=(),
+        max_text_bytes=8 * 1024 * 1024,
+    )
+    violations = scan_entries(repo, entries, bootstrap, blob_cache)
+    if violations:
+        print_violations(violations)
+        raise GuardError("baseline contains content requiring manual review")
+    resolved.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    payload = {
+        "version": 1,
+        "approved_paths": sorted(approved_paths),
+        "denied_globs": list(DEFAULT_DENIED_GLOBS),
+        "approved_binary_sha256": dict(sorted(binary_hashes.items())),
+        "allow_user_path_globs": [],
+        "max_text_bytes": 8 * 1024 * 1024,
+    }
+    temporary = resolved.with_name(resolved.name + ".tmp")
+    try:
+        with temporary.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        temporary.chmod(0o600)
+        temporary.replace(resolved)
+    except OSError as exc:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise GuardError("policy could not be written") from exc
+
+
+def print_violations(violations: list[tuple[str, str]]) -> None:
+    limit = 100
+    for rule, path in violations[:limit]:
+        print(f"{rule}: {path}")
+    if len(violations) > limit:
+        print(f"additional violations suppressed: {len(violations) - limit}")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--repo", default=".", help="repository root")
+    parser.add_argument(
+        "--policy",
+        default=os.environ.get(
+            "DOTS_UPLOAD_GUARD_POLICY", "~/.config/dots-upload-guard/policy.json"
+        ),
+        help="trusted local policy path",
+    )
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--staged", action="store_true", help="scan the complete Git index")
+    mode.add_argument("--repository", action="store_true", help="scan every local ref and reachable object")
+    mode.add_argument("--check-path", type=Path, help="scan one explicit filesystem path")
+    mode.add_argument("--init-policy", action="store_true", help="create a local policy from the current index")
+    parser.add_argument(
+        "--accept-baseline",
+        action="store_true",
+        help="explicitly accept the scanned current index for --init-policy",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    repo = Path(args.repo).expanduser().resolve()
+    try:
+        if args.init_policy:
+            if not args.accept_baseline:
+                raise GuardError("--init-policy requires --accept-baseline")
+            initialize_policy(repo, Path(args.policy))
+            print("public upload guard: local policy initialized")
+            return 0
+        policy = load_policy(Path(args.policy), repo)
+        if args.staged:
+            violations = scan_staged(repo, policy)
+        elif args.repository:
+            violations = scan_repository(repo, policy)
+        else:
+            violations = check_filesystem_path(args.check_path, policy)
+    except GuardError as exc:
+        print(f"guard-error: {exc}", file=sys.stderr)
+        return 2
+    except (OSError, ValueError) as exc:
+        print("guard-error: operational failure", file=sys.stderr)
+        return 2
+    if violations:
+        print_violations(violations)
+        return 1
+    print("public upload guard: PASS")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
