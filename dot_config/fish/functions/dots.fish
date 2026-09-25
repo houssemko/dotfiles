@@ -1,4 +1,10 @@
 function dots --description "Review and push already-captured public dotfile changes."
+    argparse -n dots 'y/yes' -- $argv
+    or return 1
+    if test (count $argv) -gt 0
+        echo "dots: usage: dots [-y|--yes]" >&2
+        return 1
+    end
     set -l repo (git rev-parse --show-toplevel 2>/dev/null)
     if not set -q repo[1]
         if test -e "$HOME/.dotfiles/.git"
@@ -193,11 +199,15 @@ function dots --description "Review and push already-captured public dotfile cha
     end
 
     git -C $repo diff --cached --stat
-    set -l answer
-    read -P "Push these reviewed public changes? [y/N] " answer
-    if test "$answer" != y; and test "$answer" != Y
-        echo "dots: push cancelled; staged changes were left for inspection"
-        return 0
+    if set -q _flag_yes
+        echo "dots: --yes: pushing without prompt"
+    else
+        set -l answer
+        read -P "Push these reviewed public changes? [y/N] " answer
+        if test "$answer" != y; and test "$answer" != Y
+            echo "dots: push cancelled; staged changes were left for inspection"
+            return 0
+        end
     end
 
     git -C $repo commit -m "chore: update public configs"
