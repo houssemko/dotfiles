@@ -403,6 +403,18 @@ function file_loaded()
         youtube_id = youtube_id or string.match(video_path, url) or string.match(video_referer, url)
         if youtube_id then break end
     end
+    if not youtube_id then
+        local metadata = mp.get_property_native("metadata", {})
+        for _, v in pairs(metadata) do
+            if type(v) == "string" then
+                for _, url in ipairs(urls) do
+                    youtube_id = youtube_id or string.match(v, url)
+                    if youtube_id then break end
+                end
+            end
+            if youtube_id then break end
+        end
+    end
     youtube_id = youtube_id or string.match(video_path, options.local_pattern)
     
     if not youtube_id or string.len(youtube_id) < 11 or (local_pattern and string.len(youtube_id) ~= 11) then return end
