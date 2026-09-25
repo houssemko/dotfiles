@@ -7,6 +7,7 @@ cannot expand its own authorization boundary by changing a tracked policy.
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import json
 import os
@@ -234,7 +235,12 @@ def normalize_path(value: str) -> str:
 
 def glob_to_regex(pattern: str) -> re.Pattern[str]:
     """Translate a path glob while keeping path separators significant."""
-    pattern = normalize_path(pattern)
+    return _compile_glob(normalize_path(pattern))
+
+
+@functools.lru_cache(maxsize=None)
+def _compile_glob(normalized: str) -> re.Pattern[str]:
+    pattern = normalized
     pieces = ["^"]
     i = 0
     while i < len(pattern):
@@ -491,10 +497,22 @@ def check_entry(
     repo: Path,
     policy: Policy,
     blob_cache: dict[str, bytes],
+    content_cache: dict[tuple[str, str, bool], tuple],
+    path_cache: dict[str, tuple[bool, bool]],
 ) -> list[tuple[str, str]]:
     violations: list[tuple[str, str]] = []
     path = entry.path
-    if any(path_matches(path, pattern) for pattern in policy.denied_globs):
+    # Policy is fixed for the whole scan and paths recur across commits, so
+    # memoize the per-path verdicts (denied globs, user exception).
+    verdict = path_cache.get(path)
+    if verdict is None:
+        verdict = (
+            any(path_matches(path, pattern) for pattern in policy.denied_globs),
+            path_is_user_exception(path, policy),
+        )
+        path_cache[path] = verdict
+    denied, user_exception = verdict
+    if denied:
         violations.append(("denied-path", path))
         return violations
     if path not in policy.approved_paths:
@@ -518,21 +536,41 @@ def check_entry(
         violations.append(("unsupported-mode", path))
         return violations
 
-    data = read_blob(repo, entry.object_id, blob_cache)
-    if is_binary(data):
-        digest = hashlib.sha256(data).hexdigest()
-        if policy.approved_binary_sha256.get(path) != digest:
+    # Content findings depend only on blob bytes plus the path-derived scan
+    # flags (suffix class, user exception), so cache them by blob id. The same
+    # blob recurs in many commits; without this, repository scans re-run every
+    # secret regex over multi-megabyte single-line files once per commit.
+    suffix = posixpath.splitext(path)[1].lower()
+    content_key = (entry.object_id, suffix, user_exception)
+    finding = content_cache.get(content_key)
+    if finding is None:
+        data = read_blob(repo, entry.object_id, blob_cache)
+        if is_binary(data):
+            finding = ("binary", hashlib.sha256(data).hexdigest())
+        elif len(data) > policy.max_text_bytes:
+            finding = ("oversize",)
+        else:
+            try:
+                text = data.decode("utf-8")
+            except UnicodeDecodeError:
+                finding = ("bad-encoding",)
+            else:
+                # scan_text derives its path dependence from exactly the
+                # suffix class and user exception captured in content_key.
+                finding = ("text", tuple(scan_text(path, text, policy)))
+        content_cache[content_key] = finding
+    kind = finding[0]
+    if kind == "binary":
+        if policy.approved_binary_sha256.get(path) != finding[1]:
             violations.append(("unapproved-binary", path))
         return violations
-    if len(data) > policy.max_text_bytes:
+    if kind == "oversize":
         violations.append(("oversize-text", path))
         return violations
-    try:
-        text = data.decode("utf-8")
-    except UnicodeDecodeError:
+    if kind == "bad-encoding":
         violations.append(("unknown-encoding", path))
         return violations
-    for rule, line_number in scan_text(path, text, policy):
+    for rule, line_number in finding[1]:
         violations.append((rule, f"{path}:{line_number}"))
     return violations
 
@@ -542,13 +580,15 @@ def scan_entries(
     entries: Iterable[TreeEntry],
     policy: Policy,
     blob_cache: dict[str, bytes],
+    content_cache: dict[tuple[str, str, bool], tuple],
+    path_cache: dict[str, tuple[bool, bool]],
 ) -> list[tuple[str, str]]:
     violations: list[tuple[str, str]] = []
     seen: set[tuple[str, str]] = set()
     for entry in entries:
         # The same blob can appear under multiple paths; path authorization is
-        # still checked for every path, while content parsing is cached.
-        for violation in check_entry(entry, repo, policy, blob_cache):
+        # still checked for every path, while content findings are cached.
+        for violation in check_entry(entry, repo, policy, blob_cache, content_cache, path_cache):
             if violation not in seen:
                 seen.add(violation)
                 violations.append(violation)
@@ -562,8 +602,10 @@ def scan_staged(repo: Path, policy: Policy) -> list[tuple[str, str]]:
         raise GuardError("the Git index could not be resolved") from exc
     entries = parse_tree_entries(repo, tree)
     cache: dict[str, bytes] = {}
+    content_cache: dict[tuple[str, str, bool], tuple] = {}
+    path_cache: dict[str, tuple[bool, bool]] = {}
     read_blobs(repo, (entry.object_id for entry in entries if entry.object_type == "blob"), cache)
-    return scan_entries(repo, entries, policy, cache)
+    return scan_entries(repo, entries, policy, cache, content_cache, path_cache)
 
 
 def scan_tree_object(
@@ -571,10 +613,12 @@ def scan_tree_object(
     treeish: str,
     policy: Policy,
     blob_cache: dict[str, bytes],
+    content_cache: dict[tuple[str, str, bool], tuple],
+    path_cache: dict[str, tuple[bool, bool]],
 ) -> list[tuple[str, str]]:
     entries = parse_tree_entries(repo, treeish)
     read_blobs(repo, (entry.object_id for entry in entries if entry.object_type == "blob"), blob_cache)
-    return scan_entries(repo, entries, policy, blob_cache)
+    return scan_entries(repo, entries, policy, blob_cache, content_cache, path_cache)
 
 
 def scan_ref_object(
@@ -583,6 +627,8 @@ def scan_ref_object(
     object_type: str,
     policy: Policy,
     blob_cache: dict[str, bytes],
+    content_cache: dict[tuple[str, str, bool], tuple],
+    path_cache: dict[str, tuple[bool, bool]],
     seen: set[str],
 ) -> list[tuple[str, str]]:
     if object_id in seen:
@@ -593,10 +639,19 @@ def scan_ref_object(
         raw = git(repo, "cat-file", "commit", object_id).decode("utf-8", "replace")
         for rule, line_number in scan_text(f"commit-{object_id}", raw, policy):
             violations.append((rule, f"commit:{line_number}"))
-        violations.extend(scan_tree_object(repo, object_id, policy, blob_cache))
+        # Commit messages are per-commit and always scanned. Trees recur
+        # across commits, so scan each unique tree once. The tree id is parsed
+        # from the already-fetched commit object (no extra Git call).
+        tree_match = re.search(r"^tree ([0-9a-f]{40,64})$", raw, re.MULTILINE)
+        tree_id = tree_match.group(1) if tree_match else ""
+        if tree_id and tree_id not in seen:
+            seen.add(tree_id)
+            violations.extend(
+                scan_tree_object(repo, object_id, policy, blob_cache, content_cache, path_cache)
+            )
         return violations
     if object_type == "tree":
-        return scan_tree_object(repo, object_id, policy, blob_cache)
+        return scan_tree_object(repo, object_id, policy, blob_cache, content_cache, path_cache)
     if object_type == "blob":
         return [("unpathed-blob", object_id)]
     if object_type == "tag":
@@ -615,6 +670,8 @@ def scan_ref_object(
                 type_match.group(1),
                 policy,
                 blob_cache,
+                content_cache,
+                path_cache,
                 seen,
             )
         )
@@ -628,6 +685,8 @@ def scan_repository(
     pushed_oids: Iterable[str] = (),
 ) -> list[tuple[str, str]]:
     blob_cache: dict[str, bytes] = {}
+    content_cache: dict[tuple[str, str, bool], tuple] = {}
+    path_cache: dict[str, tuple[bool, bool]] = {}
     violations: list[tuple[str, str]] = []
     commits = [line for line in git_text(repo, "rev-list", "--all").splitlines() if line]
     refs_text = git(repo, "for-each-ref", "--format=%(objectname) %(objecttype)").decode(
@@ -643,7 +702,7 @@ def scan_repository(
             raise GuardError("Git push input contained an invalid object ID")
         object_type = git_text(repo, "cat-file", "-t", object_id)
         violations.extend(
-            scan_ref_object(repo, object_id, object_type, policy, blob_cache, seen)
+            scan_ref_object(repo, object_id, object_type, policy, blob_cache, content_cache, path_cache, seen)
         )
     try:
         head = git_text(repo, "rev-parse", "--verify", "HEAD")
@@ -651,9 +710,13 @@ def scan_repository(
         if commits or ref_lines:
             raise
     else:
-        violations.extend(scan_ref_object(repo, head, "commit", policy, blob_cache, seen))
+        violations.extend(
+            scan_ref_object(repo, head, "commit", policy, blob_cache, content_cache, path_cache, seen)
+        )
     for commit in commits:
-        violations.extend(scan_ref_object(repo, commit, "commit", policy, blob_cache, seen))
+        violations.extend(
+            scan_ref_object(repo, commit, "commit", policy, blob_cache, content_cache, path_cache, seen)
+        )
 
     for line in ref_lines:
         parts = line.split()
@@ -661,7 +724,7 @@ def scan_repository(
             raise GuardError("Git returned an invalid ref")
         object_id, object_type = parts
         violations.extend(
-            scan_ref_object(repo, object_id, object_type, policy, blob_cache, seen)
+            scan_ref_object(repo, object_id, object_type, policy, blob_cache, content_cache, path_cache, seen)
         )
     return violations
 
@@ -760,7 +823,7 @@ def initialize_policy(repo: Path, policy_path: Path) -> None:
         allow_user_path_globs=(),
         max_text_bytes=8 * 1024 * 1024,
     )
-    violations = scan_entries(repo, entries, bootstrap, blob_cache)
+    violations = scan_entries(repo, entries, bootstrap, blob_cache, {}, {})
     if violations:
         print_violations(violations)
         raise GuardError("baseline contains content requiring manual review")

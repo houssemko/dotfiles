@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-GUARD = REPO_ROOT / "dot_local" / "bin" / "dots-upload-guard"
+GUARD = REPO_ROOT / "dot_local" / "bin" / "executable_dots-upload-guard"
 
 
 class GuardTests(unittest.TestCase):

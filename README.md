@@ -68,7 +68,7 @@ The source dir follows chezmoi conventions:
 | Source | Target |
 |--------|--------|
 | `dot_config/fish/config.fish` | `~/.config/fish/config.fish` |
-| `dot_local/bin/dots-upload-guard` | `~/.local/bin/dots-upload-guard` |
+| `dot_local/bin/executable_dots-upload-guard` | `~/.local/bin/dots-upload-guard` (executable via `executable_` prefix) |
 
 `private_fish_variables`, OpenCode service/session state, credentials, and nested
 Git metadata are local-only and must not be added to the public source.
